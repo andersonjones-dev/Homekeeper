@@ -169,6 +169,13 @@ function titleCase(s) {
   return s ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
+// Restore the capitalisation the speaker/typist used (e.g. "AC", "LG") for words that came from the original text.
+function restoreCase(s, raw) {
+  const map = new Map();
+  String(raw || '').split(/\s+/).forEach((w) => { const k = w.replace(/[^\w']/g, '').toLowerCase(); if (k && !map.has(k)) map.set(k, w.replace(/[.,!?]+$/, '')); });
+  return titleCase(String(s || '').split(' ').map((w) => (map.has(w.toLowerCase()) && /[A-Z]/.test(map.get(w.toLowerCase()).slice(1)) ? map.get(w.toLowerCase()) : w)).join(' '));
+}
+
 function parseShoppingItems(text) {
   const parts = text.split(/\s*(?:,|\band\b|\bplus\b|&)\s*/).map((p) => p.trim()).filter(Boolean);
   const NUMW = { a: '1', an: '1', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10', half: '0.5', dozen: '12' };
@@ -258,6 +265,27 @@ export function parseCommand(input, ctx) {
     }
   }
 
+  // new asset
+  m = text.match(/^(?:add|create|new|register|save|put)\s+(?:a\s+|an\s+|the\s+|my\s+|our\s+)?(.+?)\s+(?:as\s+(?:a\s+|an\s+)?(?:new\s+)?|to\s+(?:my\s+|the\s+|our\s+)?(?:home\s+)?|in\s+(?:my\s+|the\s+)?|into\s+(?:my\s+|the\s+)?)(?:asset|assets|appliance|appliances)(?:\s+list)?(\s+(?:with|having|and|,)?\s*(?:warranty|brand|purchased|bought).*)?$/) ||
+    text.match(/^(?:add|create|new)\s+(?:a\s+|an\s+)?(?:new\s+)?(?:asset|appliance)[:\s]+(.+)$/);
+  if (m) {
+    let body = ' ' + m[1] + ' ' + (m[2] || '') + ' ';
+    let warranty = '', purchase = '', brand = '';
+    const wm = body.match(/\s(?:with\s+)?warranty\s+(?:ends?|expires?|expiry|until|till|valid till|valid until)\s+(.+?)(?=\s+(?:purchased|bought|brand)\s|\s*$)/);
+    if (wm) { const d = parseDateText(wm[1], today).date; if (d) warranty = d; body = body.replace(wm[0], ' '); }
+    const pm = body.match(/\s(?:purchased|bought)\s+(?:on\s+)?(.+?)(?=\s+(?:warranty|brand)\s|\s*$)/);
+    if (pm) { const d = parseDateText(pm[1], today).date; if (d) purchase = d; body = body.replace(pm[0], ' '); }
+    const bm = body.match(/\sbrand\s+(\w+)/);
+    if (bm) { brand = restoreCase(bm[1], raw); body = body.replace(bm[0], ' '); }
+    const name = restoreCase(titleCase(body.replace(/\s+/g, ' ').trim()), raw);
+    if (name) {
+      let category = 'Other';
+      const padded = ' ' + norm(name) + ' ';
+      for (const [cat, list] of Object.entries(ASSET_ALIASES)) if (padded.includes(' ' + cat.toLowerCase() + ' ') || list.some((x) => padded.includes(' ' + x + ' ') || padded.includes(' ' + x + 's '))) { category = cat; break; }
+      return { kind: 'asset', name, category, brand, purchaseDate: purchase, warrantyExpiry: warranty, summary: 'New asset: ' + name + ' (' + category + ')' + (brand ? ', ' + brand : '') + (warranty ? ', warranty to ' + formatDate(warranty) : '') };
+    }
+  }
+
   // reminder
   m = text.match(/^(?:set\s+(?:a\s+)?)?remind(?:er)?(?:\s+me)?(?:\s+(?:to|about|that))?\s+(.+)$/) || text.match(/^add\s+(?:a\s+)?reminder(?:\s+(?:to|for|about))?\s+(.+)$/);
   if (m) {
@@ -268,24 +296,31 @@ export function parseCommand(input, ctx) {
   }
 
   // chore
-  m = text.match(/^(?:add\s+(?:a\s+)?)?(?:chore|task)[:\s]+(.+)$/) || text.match(/^assign\s+(.+?)\s+to\s+(\w+)(.*)$/) || text.match(/^(\w+)\s+(?:should|needs to|has to|must|will|to)\s+(.+)$/);
-  if (m && !/\b(buy|get)\b/.test(text.split(' ').slice(0, 3).join(' '))) {
-    let task, who = '';
-    if (/^assign/.test(text)) { task = m[1] + (m[3] || ''); who = m[2]; }
-    else if (/^(?:add\s+(?:a\s+)?)?(?:chore|task)/.test(text)) {
-      task = m[1];
-      const f = task.match(/^(.+?)\s+(?:for|by|assigned to)\s+(\w+)(.*)$/);
-      const who2 = task.match(/\b(?:for|assigned to)\s+(\w+)\b/);
-      if (who2 && !/^(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|the|next|this)$/.test(who2[1])) {
-        who = who2[1];
-        task = task.replace(who2[0], ' ');
-      } else if (f) { /* ignore */ }
-    } else { who = m[1]; task = m[2]; if (/^(i|we|it|that|this|there|you)$/.test(who)) { who = ''; } }
+  const CH = '(?:chores?|tasks?|jobs?)';
+  const VERBS = /^(clean|wash|take|water|cook|mop|sweep|buy|pay|fix|feed|call|empty|dust|wipe|iron|fold|organi[sz]e|tidy|vacuum|check|change|replace|put|make|do|set|throw|bring|pick|drop|walk|charge|refill|clear|turn|cut|trim|repair|arrange|sort|scrub|polish|prepare|book|order|water)$/;
+  let task = null, who = '', explicit = false;
+  if ((m = text.match(new RegExp('^(?:please\\s+)?(?:add|create|give|set|assign)\\s+(?:a\\s+|the\\s+|new\\s+)*' + CH + '\\s+(?:to|for)\\s+(\\w+)\\s+(?:to\\s+)?(.+)$'))) && !VERBS.test(m[1])) {
+    who = m[1]; task = m[2]; explicit = true;
+  } else if ((m = text.match(new RegExp('^(?:please\\s+)?(?:add|create|give|set)\\s+(?:a\\s+|the\\s+|new\\s+)*' + CH + '\\s+to\\s+(.+)$')))) {
+    task = m[1]; explicit = true;
+  } else if ((m = text.match(/^assign\s+(.+?)\s+to\s+(\w+)(.*)$/))) {
+    task = m[1] + (m[3] || ''); who = m[2]; explicit = true;
+  } else if ((m = text.match(new RegExp('^(?:please\\s+)?(?:add|create)\\s+(?:a\\s+|the\\s+|new\\s+)*' + CH + '[:\\s]+(.+)$')))) {
+    task = m[1]; explicit = true;
+    const who2 = task.match(/\b(?:for|assigned to)\s+(\w+)\b/);
+    if (who2 && !/^(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|the|next|this|a|an)$/.test(who2[1])) { who = who2[1]; task = task.replace(who2[0], ' '); }
+  } else if ((m = text.match(/^(?:ask|tell)\s+(\w+)\s+to\s+(.+)$/))) {
+    who = m[1]; task = m[2]; explicit = true;
+  } else if ((m = text.match(/^(\w+)\s+(?:should|needs to|has to|must|will|to)\s+(.+)$/)) && !/^(i|we|it|that|this|there|you|add|buy|get|pay|remind|bought|paid|mark|remove|delete)$/.test(m[1])) {
+    who = m[1]; task = m[2];
+  }
+  if (task != null) {
     const { repeat, rest: r1 } = parseRepeat(task);
     const { date, rest } = parseDateText(r1, today);
-    const title = titleCase(rest);
-    if (title && (who || /^(?:add\s+(?:a\s+)?)?(?:chore|task)/.test(text) || /^assign/.test(text))) {
-      return { kind: 'chore', title, assignee: titleCase(who), due: date || '', repeat, summary: 'Chore: ' + title + (who ? ' for ' + titleCase(who) : '') + (date ? ' — ' + formatDate(date) : '') + (repeat !== 'none' ? ' (' + repeat + ')' : '') };
+    const title = restoreCase(titleCase(rest.replace(/^(?:to|that)\s+/, '').replace(/\s+(?:on|by|for|at)$/, '')), raw);
+    if (title && (who || explicit)) {
+      const wh = titleCase(who);
+      return { kind: 'chore', title, assignee: wh, due: date || '', repeat, summary: 'Chore: ' + title + (wh ? ' for ' + wh : '') + (date ? ' — ' + formatDate(date) : '') + (repeat !== 'none' ? ' (' + repeat + ')' : '') };
     }
   }
 
@@ -325,6 +360,9 @@ export function applyCommand(store, cmd) {
     case 'bill':
       store.mutate('Bill added', (tx) => tx.add('bills', { name: cmd.name, type: cmd.type, amount: cmd.amount || 0, due: cmd.due || '', repeat: cmd.repeat || 'none', notes: '', paid: false, paidAt: '' }));
       return 'Bill added';
+    case 'asset':
+      store.mutate('Asset added', (tx) => tx.add('assets', { name: cmd.name, category: cmd.category, brand: cmd.brand || '', purchaseDate: cmd.purchaseDate || '', warrantyExpiry: cmd.warrantyExpiry || '', notes: '' }));
+      return 'Asset added';
     case 'service':
       store.mutate('Service logged', (tx) => tx.add('services', { assetId: cmd.assetId, date: cmd.date, desc: cmd.desc, cost: cmd.cost }));
       return 'Service logged';
