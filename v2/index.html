@@ -19,7 +19,31 @@
 </head>
 <body>
 <div id="app"></div>
+<script>
+// Shows the real error on screen if the app cannot start.
+(function(){
+  var sizes={"js/util.js": 6992, "js/store.js": 11839, "js/parser.js": 18384, "js/calendar.js": 2214, "js/notify.js": 4982, "js/sync.js": 6393, "js/ui.js": 14922, "js/screens.js": 54946, "js/voice.js": 4176, "js/app.js": 11004, "css/app.css": 25477};
+  function show(msg){var a=document.getElementById('app');if(!a)return;var d=document.createElement('div');d.style.cssText='padding:24px 20px;font:14px/1.5 -apple-system,system-ui,sans-serif;color:#24312C;word-break:break-word';d.setAttribute('data-boot-error','1');d.textContent=msg;a.appendChild(d);}
+  window.__bootErr=[];
+  window.addEventListener('error',function(e){window.__bootErr.push(e.message);});
+  window.__bootCheck=function(reason){
+    var out=['HomeKeeper could not start.','Reason: '+reason,''];
+    var keys=Object.keys(sizes);var i=0;
+    (function next(){
+      if(i>=keys.length){show(out.join('\n'));return;}
+      var k=keys[i++];
+      fetch(k+'?v='+Date.now(),{cache:'no-store'}).then(function(r){
+        if(!r.ok){out.push(k+': NOT FOUND ('+r.status+')');return null;}
+        return r.arrayBuffer().then(function(b){if(b.byteLength!==sizes[k])out.push(k+': size '+b.byteLength+' bytes, expected '+sizes[k]);});
+      }).catch(function(e){out.push(k+': '+e);}).then(next);
+    })();
+  };
+})();
+</script>
+
 <noscript>HomeKeeper needs JavaScript.</noscript>
-<script type="module" src="js/app.js"></script>
+<script type="module">
+import('./js/app.js').catch(function(e){window.__bootCheck(String(e&&e.message||e));});
+</script>
 </body>
 </html>
