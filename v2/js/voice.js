@@ -14,6 +14,27 @@ export function openVoice(A) {
   const status = h('div', { class: 'voice-status' }, SR ? 'Tap the microphone and speak' : 'Voice recognition isn’t available here. Type below, or tap the keyboard’s microphone key to dictate.');
 
   const ctx = () => ({ today: todayStr(), assets: store.live('assets'), chores: store.live('chores'), shopping: store.live('shopping'), bills: store.live('bills'), reminders: store.live('reminders'), currency: store.shared.currency });
+  const EXAMPLES = [
+    'Add 2 litres milk and bread',
+    'Add chore to Dad clean the bathroom on Saturday',
+    'Remind me to renew insurance on 25 October',
+    'Electricity bill 1200 due on the 20th',
+    'AC service cost 3500',
+    'Add a refrigerator as a new asset',
+    'Bought milk',
+    'Paid electricity',
+    'Remove eggs from the list',
+  ];
+  const examples = h('div', { class: 'voice-examples', 'data-testid': 'voice-examples' },
+    h('div', { class: 'voice-eg-title' }, 'Try saying'),
+    h('div', { class: 'voice-eg' }, EXAMPLES.map((x) => h('button', { type: 'button', class: 'voice-eg-item', onclick: () => { input.value = x; understand(); } }, '“' + x + '”'))));
+  function change() {
+    cmd = null;
+    result.replaceChildren();
+    status.textContent = 'Edit the text, then press Return or wait a moment.';
+    input.focus();
+    try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) { /* ignore */ }
+  }
   function understand() {
     const text = input.value.trim();
     result.replaceChildren();
@@ -21,17 +42,13 @@ export function openVoice(A) {
     if (!text) return;
     cmd = parseCommand(text, ctx());
     if (!cmd) {
-      result.append(h('div', { class: 'voice-miss' }, 'I didn’t catch that. Try one of these:'),
-        h('ul', { class: 'voice-eg' }, [
-          'Add 2 litres milk and bread', 'Remind me to renew insurance on 25 October', 'Add chore wash the car for Dad on Saturday',
-          'Electricity bill 1200 due on the 20th', 'AC service cost 3500', 'Bought milk', 'Paid electricity', 'Remove eggs from the list',
-        ].map((x) => h('li', null, x))));
+      result.append(h('div', { class: 'voice-card miss' }, h('div', { class: 'voice-miss' }, 'I didn’t catch that.'), h('div', { class: 'voice-miss-sub' }, 'Reword it or tap one of the examples below.')));
       return;
     }
     result.append(h('div', { class: 'voice-card' }, h('div', { class: 'voice-card-label' }, 'I understood'), h('div', { class: 'voice-card-text', 'data-testid': 'voice-summary' }, cmd.summary)),
       h('div', { class: 'form-actions' },
-        h('button', { class: 'keep-btn', onclick: () => { input.focus(); } }, 'Change'),
-        h('button', { class: 'primary-btn', 'data-testid': 'voice-confirm', onclick: () => { const msg = applyCommand(store, cmd); sheet.close(); toast(msg, cmd.kind !== 'undo'); } }, 'Do it')));
+        h('button', { class: 'keep-btn', type: 'button', 'data-testid': 'voice-change', onclick: change }, 'Change'),
+        h('button', { class: 'primary-btn', type: 'button', 'data-testid': 'voice-confirm', onclick: () => { const msg = applyCommand(store, cmd); sheet.close(); toast(msg, cmd.kind !== 'undo'); } }, 'Do it')));
   }
   input.addEventListener('input', () => { if (!listening) { clearTimeout(input._t); input._t = setTimeout(understand, 500); } });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); understand(); } });
@@ -50,7 +67,7 @@ export function openVoice(A) {
     try { rec.start(); } catch (e) { status.textContent = 'Couldn’t start the microphone. Type instead.'; }
   });
 
-  const sheet = openSheet('Voice input', h('div', { class: 'voice' }, mic, status, input, result), () => stop());
+  const sheet = openSheet('Voice input', h('div', { class: 'voice' }, mic, status, input, result, examples), () => stop());
   setTimeout(() => { if (!SR) input.focus(); }, 50);
   return sheet;
 }
