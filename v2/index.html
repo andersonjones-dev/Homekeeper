@@ -43,7 +43,23 @@
 
 <noscript>HomeKeeper needs JavaScript.</noscript>
 <script type="module">
-import('./js/app.js').catch(function(e){window.__bootCheck(String(e&&e.message||e));});
+// The older HomeKeeper site has its own service worker that covers this folder and can serve stale files.
+// Take over this folder with our own worker first, then start the app.
+async function takeOver(){
+  if(!('serviceWorker' in navigator))return;
+  try{
+    await navigator.serviceWorker.register('./sw.js',{scope:'./'});
+    await navigator.serviceWorker.ready;
+    var ours=function(){var c=navigator.serviceWorker.controller;return c&&/\/v2\/sw\.js/.test(c.scriptURL);};
+    if(!ours()){
+      await new Promise(function(res){
+        var t=setTimeout(res,2500);
+        navigator.serviceWorker.addEventListener('controllerchange',function(){if(ours()){clearTimeout(t);res();}});
+      });
+    }
+  }catch(e){}
+}
+takeOver().then(function(){return import('./js/app.js');}).catch(function(e){window.__bootCheck(String(e&&e.message||e));});
 </script>
 </body>
 </html>
