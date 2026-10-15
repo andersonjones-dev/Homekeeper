@@ -62,8 +62,8 @@ function applyTheme() {
   const pref = store.prefs.theme;
   const dark = pref === 'dark' || (pref === 'auto' && mq && mq.matches);
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  const m = document.querySelector('meta[name=theme-color]');
-  if (m) m.setAttribute('content', dark ? '#121815' : '#F7F6F0');
+  // Keep every theme-color tag in step so the phone's status bar matches the app (iOS tints it from this tag).
+  document.querySelectorAll('meta[name=theme-color]').forEach((m) => { m.setAttribute('content', dark ? '#121815' : '#F7F6F0'); m.removeAttribute('media'); });
 }
 if (mq && mq.addEventListener) mq.addEventListener('change', applyTheme);
 
