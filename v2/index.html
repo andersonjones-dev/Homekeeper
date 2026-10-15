@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>HomeKeeper</title>
-<meta name="theme-color" content="#F7F6F0">
+<meta name="theme-color" content="#F7F6F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121815" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -22,7 +23,7 @@
 <script>
 // Shows the real error on screen if the app cannot start.
 (function(){
-  var sizes={"js/util.js": 6992, "js/store.js": 11839, "js/parser.js": 18384, "js/calendar.js": 2214, "js/notify.js": 4982, "js/sync.js": 6393, "js/ui.js": 14922, "js/screens.js": 54946, "js/voice.js": 4176, "js/app.js": 11004, "css/app.css": 25477};
+  var sizes={"js/util.js": 6992, "js/store.js": 11839, "js/parser.js": 21836, "js/calendar.js": 2214, "js/notify.js": 4982, "js/sync.js": 6393, "js/ui.js": 14922, "js/screens.js": 54946, "js/voice.js": 4948, "js/app.js": 11148, "css/app.css": 25956};
   function show(msg){var a=document.getElementById('app');if(!a)return;var d=document.createElement('div');d.style.cssText='padding:24px 20px;font:14px/1.5 -apple-system,system-ui,sans-serif;color:#24312C;word-break:break-word';d.setAttribute('data-boot-error','1');d.textContent=msg;a.appendChild(d);}
   window.__bootErr=[];
   window.addEventListener('error',function(e){window.__bootErr.push(e.message);});
