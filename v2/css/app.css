@@ -232,5 +232,7 @@ textarea.input { min-height: 108px; padding: 14px 15px; resize: vertical; line-h
 .voice-status { text-align: center; font-size: 12px; color: var(--muted-fg); line-height: 1.5; }
 .voice-input { min-height: 72px; padding: 12px 15px; }
 .voice-card { background: var(--secondary); border-radius: 18px; padding: 15px; } .voice-card-label { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; color: var(--secondary-fg); margin-bottom: 6px; } .voice-card-text { font-size: 15px; font-weight: 600; line-height: 1.4; }
-.voice-miss { font-size: 13px; font-weight: 600; } .voice-eg { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted-fg); line-height: 1.9; }
+.voice-card.miss { background: var(--card); border: 1px solid var(--border); } .voice-miss { font-size: 14px; font-weight: 600; } .voice-miss-sub { font-size: 12px; color: var(--muted-fg); margin-top: 4px; }
+.voice-examples { margin-top: 4px; } .voice-eg-title { font-size: 10px; font-weight: 600; letter-spacing: 1.4px; color: var(--muted-fg); text-transform: uppercase; margin: 0 2px 8px; }
+.voice-eg { display: flex; flex-direction: column; gap: 6px; } .voice-eg-item { width: 100%; padding: 11px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--border); font-size: 13px; line-height: 1.4; color: var(--fg); }
 .voice-result .form-actions { margin-top: 12px; }
