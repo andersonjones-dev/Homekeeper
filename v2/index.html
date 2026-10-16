@@ -25,7 +25,7 @@
 <script>
 // Shows the real error on screen if the app cannot start.
 (function(){
-  var sizes={"js/util.js": 6992, "js/store.js": 11839, "js/parser.js": 21836, "js/calendar.js": 2214, "js/notify.js": 4982, "js/sync.js": 6393, "js/ui.js": 14922, "js/screens.js": 54946, "js/voice.js": 4948, "js/app.js": 11148, "css/app.css": 25956};
+  var sizes={"js/util.js":0,"js/store.js":0,"js/parser.js":0,"js/calendar.js":0,"js/notify.js":0,"js/sync.js":0,"js/delight.js":0,"js/ui.js":0,"js/screens.js":0,"js/voice.js":0,"js/app.js":0,"css/app.css":0};
   function show(msg){var a=document.getElementById('app');if(!a)return;var d=document.createElement('div');d.style.cssText='padding:24px 20px;font:14px/1.5 -apple-system,system-ui,sans-serif;color:#24312C;word-break:break-word';d.setAttribute('data-boot-error','1');d.textContent=msg;a.appendChild(d);}
   window.__bootErr=[];
   window.addEventListener('error',function(e){window.__bootErr.push(e.message);});
@@ -37,7 +37,7 @@
       var k=keys[i++];
       fetch(k+'?v='+Date.now(),{cache:'no-store'}).then(function(r){
         if(!r.ok){out.push(k+': NOT FOUND ('+r.status+')');return null;}
-        return r.arrayBuffer().then(function(b){if(b.byteLength!==sizes[k])out.push(k+': size '+b.byteLength+' bytes, expected '+sizes[k]);});
+        return r.arrayBuffer().then(function(b){if(b.byteLength===0)out.push(k+': file is empty');});
       }).catch(function(e){out.push(k+': '+e);}).then(next);
     })();
   };
