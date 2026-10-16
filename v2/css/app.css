@@ -243,3 +243,16 @@ textarea.input { min-height: 108px; padding: 14px 15px; resize: vertical; line-h
 :root[data-theme="dark"] { color-scheme: dark; }
 body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 50; pointer-events: none; }
 .cal-actions { display: flex; flex-direction: column; gap: 10px; } .cal-actions .keep-btn { justify-content: center; }
+
+/* Completion pop-up */
+.toast.cheer { align-items: flex-start; justify-content: flex-start; }
+.toast.cheer .toast-undo { margin-left: auto; align-self: center; }
+.toast-msg { display: flex; flex-direction: column; gap: 3px; } .toast-title { font-size: 13px; font-weight: 600; } .toast-sub { font-size: 13px; font-weight: 400; color: var(--muted-fg); line-height: 1.35; }
+.cheer-badge { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: var(--primary-fg); display: inline-flex; align-items: center; justify-content: center; animation: pop .35s ease; }
+.toast.big { border-color: var(--primary); }
+@keyframes pop { 0% { transform: scale(.4); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .cheer-badge { animation: none; } }
+/* Cost of owning */
+.own-card { margin-top: 14px; background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.own-card.warn { border-color: var(--destructive); }
+.own-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; } .own-line, .own-note { font-size: 13px; color: var(--muted-fg); line-height: 1.4; } .own-warn { font-size: 13px; color: var(--destructive); font-weight: 600; line-height: 1.4; }
