@@ -236,3 +236,9 @@ textarea.input { min-height: 108px; padding: 14px 15px; resize: vertical; line-h
 .voice-examples { margin-top: 4px; } .voice-eg-title { font-size: 10px; font-weight: 600; letter-spacing: 1.4px; color: var(--muted-fg); text-transform: uppercase; margin: 0 2px 8px; }
 .voice-eg { display: flex; flex-direction: column; gap: 6px; } .voice-eg-item { width: 100%; padding: 11px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--border); font-size: 13px; line-height: 1.4; color: var(--fg); }
 .voice-result .form-actions { margin-top: 12px; }
+
+
+/* Status bar area: same colour as the app, in both themes, and the native controls follow the theme too. */
+:root { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 50; pointer-events: none; }
