@@ -9,6 +9,7 @@ import {
   SaveButton, toast, AssetCard, warrantyInfo, Row,
 } from './ui.js';
 import { buildICS } from './calendar.js';
+import { celebration, ownership } from './delight.js';
 import { topicFromCode } from './notify.js';
 
 export function createScreens(A) {
@@ -83,6 +84,18 @@ export function createScreens(A) {
   const ntfTri = (kind) => ({ key: 'ntf', kind: 'tri', label: 'Send me a reminder notification', defaultOn: () => store.shared.ntfDefaults[kind] });
   const repeatField = { key: 'repeat', kind: 'chips', label: 'Repeats', options: REPEATS.map((r) => ({ value: r, label: REPEAT_LABEL[r] })) };
   const withToast = (msg) => toast(msg, true);
+  let lastCheer = 0;
+  // Pop-up after something is completed: a plain confirmation every time, an occasional quip, a note when you are all caught up.
+  const cheer = (coll) => {
+    const t = today();
+    const wkStart = windowRange(t, 7, 0)[0];
+    const c = celebration(coll, {
+      fun: store.prefs.fun !== false, remaining: attention(t).length, now: Date.now(), lastAt: lastCheer,
+      doneThisWeek: store.live('chores').filter((x) => x.done && x.doneAt >= wkStart).length,
+    });
+    if (c.sub) lastCheer = Date.now();
+    toast(c.title, true, c);
+  };
 
   // ---------- HOME ----------
   function home() {
@@ -141,7 +154,7 @@ export function createScreens(A) {
       SectionHeader('Needs attention', 'Overdue or due in the next 7 days', h('div', { class: 'count-badge' }, items.length)),
       h('div', { class: 'upcoming-card', 'data-testid': 'attention-card' }, top.map((x, i) =>
         h('div', { class: 'att-row' + (i < top.length - 1 ? ' bb' : '') },
-          CheckCircle(false, () => { x.coll === 'chores' || x.coll === 'reminders' || x.coll === 'bills' ? store.setDone(x.coll, x.id, true) : null; withToast(x.coll === 'bills' ? 'Marked paid' : 'Marked done'); }, 'Mark done'),
+          CheckCircle(false, () => { x.coll === 'chores' || x.coll === 'reminders' || x.coll === 'bills' ? store.setDone(x.coll, x.id, true) : null; cheer(x.coll); }, 'Mark done'),
           h('button', { class: 'att-main', onclick: () => A.nav('/' + x.coll) },
             h('div', { class: 'upcoming-name' }, x.title), h('div', { class: 'upcoming-date' }, x.sub)),
           h('div', { class: 'days-left' + (x.days < 0 ? ' overdue' : '') }, x.days < 0 ? Math.abs(x.days) + 'd late' : x.days === 0 ? 'Today' : x.days + 'd')))),
@@ -163,7 +176,7 @@ export function createScreens(A) {
     if (id && !a) return notFound();
     const key = 'asset-' + (id || 'new');
     if (!forms[key]) {
-      const v = { name: a ? a.name : '', category: a ? a.category : '', brand: a ? a.brand : '', purchaseDate: a ? a.purchaseDate : '', warrantyExpiry: a ? a.warrantyExpiry : '', notes: a ? a.notes : '', cal: a ? a.cal : undefined, ntf: a ? a.ntf : undefined };
+      const v = { name: a ? a.name : '', category: a ? a.category : '', brand: a ? a.brand : '', purchaseDate: a ? a.purchaseDate : '', price: a && a.price ? String(a.price) : '', warrantyExpiry: a ? a.warrantyExpiry : '', notes: a ? a.notes : '', cal: a ? a.cal : undefined, ntf: a ? a.ntf : undefined };
       const errors = {};
       const eb = {};
       const errEl = (k) => (eb[k] = h('div', { class: 'field-error', role: 'alert', hidden: true }));
@@ -179,6 +192,7 @@ export function createScreens(A) {
         h('label', { class: 'label' }, 'Category *'), catWrap, errEl('category'),
         h('label', { class: 'label' }, 'Brand'), TextInput({ label: 'Brand', value: v.brand, placeholder: 'e.g. Bosch', autocapitalize: 'words', onInput: (x) => { v.brand = x; }, testid: 'asset-brand-input' }),
         h('label', { class: 'label' }, 'Purchase date'), TextInput({ label: 'Purchase date', type: 'date', value: v.purchaseDate, onInput: (x) => { v.purchaseDate = x; }, testid: 'asset-purchase-date-input' }), errEl('purchaseDate'),
+        h('label', { class: 'label' }, 'Purchase price (optional)'), TextInput({ label: 'Purchase price', value: v.price, placeholder: 'e.g. 45000', inputmode: 'decimal', onInput: (x) => { v.price = x; }, testid: 'asset-price-input' }), errEl('price'),
         h('label', { class: 'label' }, 'Warranty expiry'), TextInput({ label: 'Warranty expiry date', type: 'date', value: v.warrantyExpiry, onInput: (x) => { v.warrantyExpiry = x; }, testid: 'asset-warranty-date-input' }), errEl('warrantyExpiry'),
         h('label', { class: 'label' }, 'Notes'), TextInput({ label: 'Notes', multiline: true, value: v.notes, placeholder: 'Anything helpful to remember...', onInput: (x) => { v.notes = x; }, testid: 'asset-notes-input' }),
         h('label', { class: 'label' }, 'Warranty date on my calendar'), TriChoice(v.cal, store.shared.calDefaults.warranties, (x) => { v.cal = x; }),
@@ -192,9 +206,10 @@ export function createScreens(A) {
           if (!v.category) bad('category', 'Choose a category.');
           if (pd && !isValidDate(pd)) bad('purchaseDate', 'Use a real date in YYYY-MM-DD format.');
           if (we && !isValidDate(we)) bad('warrantyExpiry', 'Use a real date in YYYY-MM-DD format.');
+          if (v.price.trim() && parseAmount(v.price) === null) bad('price', 'Enter the price as a number, e.g. 45000.');
           if (pd && we && isValidDate(pd) && isValidDate(we) && we < pd) bad('warrantyExpiry', 'Warranty expiry must be after the purchase date.');
           if (Object.keys(errors).length) return;
-          const fields = { name, category: v.category, brand: v.brand.trim(), purchaseDate: pd, warrantyExpiry: we, notes: v.notes.trim(), cal: v.cal, ntf: v.ntf };
+          const fields = { name, category: v.category, brand: v.brand.trim(), purchaseDate: pd, price: parseAmount(v.price) || 0, warrantyExpiry: we, notes: v.notes.trim(), cal: v.cal, ntf: v.ntf };
           let newId = id;
           store.mutate(a ? 'Asset updated' : 'Asset added', (tx) => {
             if (a) tx.patch('assets', id, fields); else newId = tx.add('assets', fields).id;
@@ -215,6 +230,16 @@ export function createScreens(A) {
       h('button', { class: 'link', onclick: () => A.nav(back || '/assets', true) }, back === '/' ? 'Back to home' : 'Back to your assets'));
   }
 
+  function ownershipCard(o) {
+    if (!o.price) return null;
+    const pct = o.repairShare === null ? 0 : Math.round(o.repairShare * 100);
+    const lines = [];
+    if (o.level === 'replace') lines.push(h('div', { class: 'own-warn', 'data-testid': 'replace-nudge' }, 'Repairs have cost ' + money(o.repairs) + ', about ' + pct + '% of what you paid. It may be time to think about replacing it.'));
+    else if (o.level === 'watch') lines.push(h('div', { class: 'own-note', 'data-testid': 'watch-nudge' }, 'Repairs so far are about ' + pct + '% of the purchase price. Worth keeping an eye on.'));
+    if (o.perDay !== null) lines.push(h('div', { class: 'own-line' }, 'Owning it has cost about ', h('b', null, money(Math.round(o.perDay))), ' a day so far. It gets cheaper every day you keep it.'));
+    else lines.push(h('div', { class: 'own-line' }, 'Add a purchase date to see what it costs per day.'));
+    return h('div', { class: 'own-card' + (o.level === 'replace' ? ' warn' : ''), 'data-testid': 'ownership' }, h('div', { class: 'own-title' }, icon('trending-down', 16, 'primary'), h('span', null, 'Cost of owning')), lines);
+  }
   function assetDetail(id) {
     const a = store.get('assets', id);
     if (!a) return notFound();
@@ -223,6 +248,7 @@ export function createScreens(A) {
     const status = !a.warrantyExpiry ? 'No expiry date saved' : wd === null ? 'Date needs checking' : wd < 0 ? 'Warranty has expired' : wd <= 90 ? 'Expires in ' + wd + ' days' : 'Still covered';
     const services = store.live('services').filter((s) => s.assetId === id).sort((x, y) => y.date.localeCompare(x.date));
     const total = services.reduce((n, s) => n + (s.cost || 0), 0);
+    const own = ownership(a, services, t);
     const conf = ui.confirmDelete === id;
     const row = (label, value, ic, last) => h('div', { class: 'detail-row' + (last ? '' : ' bb') }, icon(ic, 15, 'muted'), h('div', { class: 'detail-label' }, label), h('div', { class: 'detail-value' }, value));
     const skey = 'service-' + id;
@@ -252,6 +278,7 @@ export function createScreens(A) {
           h('div', { class: 'service-cost' }, s.cost ? money(s.cost) : '—'))))
         : h('div', { class: 'quiet-card' }, h('div', { class: 'quiet-icon' }, icon('tool', 18)), h('div', { class: 'quiet-copy' }, h('div', { class: 'quiet-title' }, 'No repairs logged'), h('div', { class: 'quiet-text' }, 'Log a service or repair to track what this costs you over time.'))),
       services.length ? h('div', { class: 'total-line' }, 'Total spent: ', h('b', null, money(total))) : null,
+      ownershipCard(own),
       conf
         ? h('div', { class: 'confirm-card', role: 'alert' },
           h('div', { class: 'confirm-title' }, 'Remove ' + a.name + '?'),
@@ -296,7 +323,7 @@ export function createScreens(A) {
       names.length ? h('div', { class: 'chips filter' }, [Chip('Everyone', !ui.choreWho, () => { ui.choreWho = ''; A.render(); })].concat(names.map((n) => Chip(n, ui.choreWho === n, () => { ui.choreWho = n; A.render(); })))) : null,
       list.length
         ? h('div', { class: 'list' }, list.map((c) => forms['chore-' + c.id] || Row({
-          left: CheckCircle(c.done, () => { store.setDone('chores', c.id, !c.done); withToast(c.done ? 'Marked not done' : 'Marked done'); }, 'Mark done'),
+          left: CheckCircle(c.done, () => { const was = c.done; store.setDone('chores', c.id, !was); if (was) withToast('Marked not done'); else cheer('chores'); }, 'Mark done'),
           title: c.title, done: c.done, onClick: () => openForm('chore-' + c.id, () => choreForm(c, names)),
           sub: h('span', null, [c.assignee, c.due ? h('span', { class: !c.done && daysFromToday(c.due, today()) < 0 ? 'overdue' : '' }, dueLabel(c.due, today())) : null, c.repeat !== 'none' ? REPEAT_LABEL[c.repeat] : null].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
         })))
@@ -331,7 +358,7 @@ export function createScreens(A) {
       Segmented([{ value: 'todo', label: 'Coming up' }, { value: 'done', label: 'Done' }], ui.remTab, (v) => { ui.remTab = v; A.render(); }),
       list.length
         ? h('div', { class: 'list' }, list.map((r) => forms['rem-' + r.id] || Row({
-          left: CheckCircle(r.done, () => { store.setDone('reminders', r.id, !r.done); withToast(r.done ? 'Marked not done' : 'Marked done'); }, 'Mark done'),
+          left: CheckCircle(r.done, () => { const was = r.done; store.setDone('reminders', r.id, !was); if (was) withToast('Marked not done'); else cheer('reminders'); }, 'Mark done'),
           title: r.title, done: r.done, onClick: () => openForm('rem-' + r.id, () => reminderForm(r)),
           sub: h('span', null, [r.due ? h('span', { class: !r.done && daysFromToday(r.due, today()) < 0 ? 'overdue' : '' }, dueLabel(r.due, today())) : 'No date', r.repeat !== 'none' ? REPEAT_LABEL[r.repeat] : null].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
         })))
@@ -375,7 +402,7 @@ export function createScreens(A) {
       Segmented([{ value: 'upcoming', label: 'To pay' }, { value: 'paid', label: 'Paid' }], ui.billTab, (v) => { ui.billTab = v; A.render(); }),
       list.length
         ? h('div', { class: 'list' }, list.map((b) => forms['bill-' + b.id] || Row({
-          left: CheckCircle(b.paid, () => { store.setDone('bills', b.id, !b.paid); withToast(b.paid ? 'Marked not paid' : 'Marked paid'); }, 'Mark paid'),
+          left: CheckCircle(b.paid, () => { const was = b.paid; store.setDone('bills', b.id, !was); if (was) withToast('Marked not paid'); else cheer('bills'); }, 'Mark paid'),
           tile: BILL_ICON[b.type] || 'credit-card', title: b.name, done: b.paid, onClick: () => openForm('bill-' + b.id, () => billForm(b)),
           sub: h('span', null, [b.type, b.due ? h('span', { class: !b.paid && daysFromToday(b.due, t) < 0 ? 'overdue' : '' }, (b.paid ? 'Due ' + formatShort(b.due) : dueLabel(b.due, t))) : null, b.repeat !== 'none' ? REPEAT_LABEL[b.repeat] : null].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
           right: h('div', { class: 'amount' }, b.amount ? money(b.amount) : '—'),
@@ -519,6 +546,7 @@ export function createScreens(A) {
     const labels = [...new Set([...cur.map((x) => x.key), ...prev.keys()])].map((k) => ({ key: k, cur: (cur.find((x) => x.key === k) || { total: 0 }).total, prev: prev.get(k) || 0 })).sort((a, b) => b.cur - a.cur || b.prev - a.prev);
     const months = monthlyTotals(rows, t, 6);
     const max = Math.max(1, ...months.map((m) => m.total));
+    const replaceList = store.live('assets').map((a) => { const o = ownership(a, store.live('services').filter((s) => s.assetId === a.id), t); return { name: a.name, share: o.repairShare, level: o.level }; }).filter((x) => x.level === 'replace');
     const rising = labels.filter((l) => l.prev > 0 && l.cur > l.prev).sort((a, b) => (b.cur - b.prev) - (a.cur - a.prev));
     const wk = (off) => store.live('chores').filter((c) => c.done && c.doneAt >= windowRange(t, 7, off)[0] && c.doneAt <= windowRange(t, 7, off)[1]);
     const wkNow = wk(0), wkPrev = wk(7);
@@ -539,6 +567,7 @@ export function createScreens(A) {
           h('div', { class: 'summary-metric' }, h('div', { class: 'summary-number' }, money(q.cur)), h('div', { class: 'metric-label' }, 'this quarter')),
           h('div', { class: 'metric-divider' }),
           h('div', { class: 'summary-metric' }, h('div', { class: 'summary-number sm' }, money(q.prev)), h('div', { class: 'metric-label' }, q.prev || q.cur ? 'before that (' + chg(q.cur, q.prev) + ')' : 'before that')))),
+      replaceList.length ? h('div', { class: 'info-card warn', 'data-testid': 'replace-list' }, icon('alert-circle', 18, 'destructive'), h('div', null, replaceList.map((r) => h('div', null, r.name + ': repairs are ' + Math.round(r.share * 100) + '% of the purchase price. Maybe time to replace.')))) : null,
       rising.length ? h('div', { class: 'info-card warn', 'data-testid': 'rising' }, icon('trending-up', 18, 'destructive'), h('div', null, rising.slice(0, 3).map((r) => h('div', null, h('b', null, r.key), ' cost ' + money(r.cur) + ' this quarter, up ' + Math.round(((r.cur - r.prev) / r.prev) * 100) + '% from ' + money(r.prev) + ' last quarter.')))) : null,
       SectionHeader('By category', 'Paid bills and repairs'),
       labels.length ? h('div', { class: 'details-card' }, labels.map((l, i) => h('div', { class: 'stat-row' + (i < labels.length - 1 ? ' bb' : '') },
@@ -584,6 +613,8 @@ export function createScreens(A) {
       Card('Appearance', 'Light, dark, or match your phone',
         Segmented([{ value: 'auto', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }], p.theme, (v) => { store.setPrefs({ theme: v }); A.applyTheme(); A.render(); A.reloadIfBarStale(); }),
           h('div', { class: 'hint left' }, 'The app reloads once when the theme changes, so the phone’s status bar colour can follow it.')),
+      Card('Fun messages', 'A little cheer when you finish something',
+        h('div', { class: 'details-card' }, SetRow('Show pop-up cheers and the odd joke', null, Switch(p.fun !== false, (v) => store.setPrefs({ fun: v }), 'Fun messages'), true))),
       Card('Currency', 'Used for bills and repair costs',
         ChipGroup(['₹', '$', '£', '€', 'AED', ''].map((c) => ({ value: c, label: c || 'None' })), s.currency, (v) => store.setShared({ currency: v }))),
       Card('Add to calendar by default', 'You can still choose per item on the Calendar screen',
