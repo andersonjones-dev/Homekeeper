@@ -242,3 +242,4 @@ textarea.input { min-height: 108px; padding: 14px 15px; resize: vertical; line-h
 :root { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
 body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 50; pointer-events: none; }
+.cal-actions { display: flex; flex-direction: column; gap: 10px; } .cal-actions .keep-btn { justify-content: center; }
