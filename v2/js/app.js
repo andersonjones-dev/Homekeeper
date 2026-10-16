@@ -42,6 +42,12 @@ const A = {
     const ics = buildICS(items.map((w) => ({ id: w.id, title: w.title, date: w.date, notes: w.notes })), { alarm });
     await deliverFile('homekeeper.ics', ics, 'text/calendar');
   },
+  // One tap: hand the events straight to the phone's Calendar. iPhone opens a calendar file link with its own "Add All" sheet.
+  openInCalendar(items, alarm) {
+    const ics = buildICS(items.map((w) => ({ id: w.id, title: w.title, date: w.date, notes: w.notes })), { alarm });
+    const a = h('a', { href: 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics), target: '_blank', rel: 'noopener' });
+    document.body.appendChild(a); a.click(); a.remove();
+  },
   async exportBackup() { await deliverFile('homekeeper-backup-' + todayStr() + '.json', JSON.stringify(store.exportData(), null, 2), 'application/json'); },
 };
 async function deliverFile(name, text, type) {
