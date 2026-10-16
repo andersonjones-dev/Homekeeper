@@ -15,6 +15,7 @@ export const DEFAULT_SHARED = () => ({
 });
 export const DEFAULT_PREFS = () => ({
   theme: 'auto',
+  fun: true,
   name: '',
   familyCode: '',
   deviceId: uid(),
