@@ -502,8 +502,10 @@ export function createScreens(A) {
             title: w.title, sub: KIND_LABEL[w.kind] + ' · ' + formatDate(w.date), onClick: () => A.nav('/' + (w.coll === 'assets' ? 'assets/' + w.id : w.coll)),
           })))))
         : EmptyCard({ icon: 'calendar', title: 'Nothing dated yet', text: 'Add due dates to chores, bills and reminders, or a warranty date to an asset, and they will appear here.' }),
-      sel.length ? h('button', { class: 'save-btn sticky', onclick: () => A.exportCalendar(sel, alarm), 'data-testid': 'export-calendar' }, icon('download', 18), h('span', null, 'Add ' + sel.length + (sel.length === 1 ? ' item' : ' items') + ' to calendar')) : null,
-      sel.length ? h('div', { class: 'hint' }, 'This opens a calendar file. Tap “Add All”. Sending it again later updates the same events.') : null);
+      sel.length ? h('div', { class: 'cal-actions' },
+        h('button', { class: 'save-btn sticky', onclick: () => A.openInCalendar(sel, alarm), 'data-testid': 'open-calendar' }, icon('calendar', 18), h('span', null, 'Add ' + sel.length + (sel.length === 1 ? ' item' : ' items') + ' to Calendar')),
+        h('button', { class: 'keep-btn wide', onclick: () => A.exportCalendar(sel, alarm), 'data-testid': 'export-calendar' }, icon('download', 16), h('span', null, 'Share or save as a file instead'))) : null,
+      sel.length ? h('div', { class: 'hint' }, 'Tap the green button and choose “Add All” when the Calendar sheet appears. If nothing opens, use “Share or save as a file”, pick Save to Files, open the file in the Files app and tap Add All. Doing it again later updates the same events.') : null);
   }
 
   // ---------- INSIGHTS ----------
@@ -580,7 +582,8 @@ export function createScreens(A) {
     return screen(
       hdr({ eyebrow: 'PREFERENCES', title: 'Settings', subtitle: 'Make HomeKeeper yours' }),
       Card('Appearance', 'Light, dark, or match your phone',
-        Segmented([{ value: 'auto', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }], p.theme, (v) => { store.setPrefs({ theme: v }); A.applyTheme(); A.render(); })),
+        Segmented([{ value: 'auto', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }], p.theme, (v) => { store.setPrefs({ theme: v }); A.applyTheme(); A.render(); A.reloadIfBarStale(); }),
+          h('div', { class: 'hint left' }, 'The app reloads once when the theme changes, so the phone’s status bar colour can follow it.')),
       Card('Currency', 'Used for bills and repair costs',
         ChipGroup(['₹', '$', '£', '€', 'AED', ''].map((c) => ({ value: c, label: c || 'None' })), s.currency, (v) => store.setShared({ currency: v }))),
       Card('Add to calendar by default', 'You can still choose per item on the Calendar screen',
@@ -607,7 +610,7 @@ export function createScreens(A) {
               h('div', { class: 'btn-row' }, h('button', { class: 'keep-btn wide', onclick: () => A.shareText('Join my HomeKeeper family: ' + p.familyCode) }, icon('send', 16), h('span', null, 'Share code')), syncBtn),
               status,
               h('button', { class: 'delete-btn', onclick: () => { A.sync.leave(); A.render(); toast('Left the family. Data on this phone is kept.'); } }, h('span', null, 'Leave family'))]
-            : [h('div', { class: 'set-sub pad-b' }, 'Create a code on one phone, then enter it on the other. Everything is encrypted on your phone before it is sent, so the sync server cannot read it.'),
+            : [h('div', { class: 'set-sub pad-b' }, 'Safari and the Home Screen app keep separate data on the same phone, so use a code to share between them too. Create a code on one, then enter it on the other. Everything is encrypted on your phone before it is sent, so the sync server cannot read it.'),
               createBtn, h('div', { class: 'label inline' }, 'Or join with a code'), joinInput, joinBtn],
           h('details', { class: 'adv' }, h('summary', null, 'Advanced'),
             h('div', { class: 'set-sub' }, 'Use your own sync endpoint (any URL that accepts GET and PUT of JSON). Leave empty for the default.'),
