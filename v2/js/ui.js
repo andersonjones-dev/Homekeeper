@@ -135,14 +135,16 @@ export function FormButtons(onSave, onCancel, saveLabel) {
 // ---- toast with Undo ----
 let toastEl = null, toastTimer = null, undoFn = null;
 export function setUndoHandler(fn) { undoFn = fn; }
-export function toast(message, withUndo) {
+export function toast(message, withUndo, extra) {
   if (toastEl) toastEl.remove();
   clearTimeout(toastTimer);
-  toastEl = h('div', { class: 'toast', role: 'status', 'data-testid': 'toast' },
-    h('span', { class: 'toast-msg' }, message),
+  const cheer = extra && extra.fun;
+  toastEl = h('div', { class: 'toast' + (cheer ? ' cheer' : '') + (extra && extra.big ? ' big' : ''), role: 'status', 'data-testid': 'toast' },
+    cheer && h('span', { class: 'cheer-badge', 'aria-hidden': 'true' }, icon('check', 16)),
+    h('span', { class: 'toast-msg' }, h('span', { class: 'toast-title' }, message), extra && extra.sub ? h('span', { class: 'toast-sub', 'data-testid': 'toast-sub' }, extra.sub) : null),
     withUndo && h('button', { class: 'toast-undo', onclick: () => { if (undoFn) undoFn(); if (toastEl) toastEl.remove(); toastEl = null; } }, 'Undo'));
   document.body.appendChild(toastEl);
-  toastTimer = setTimeout(() => { if (toastEl) toastEl.remove(); toastEl = null; }, withUndo ? 6500 : 3500);
+  toastTimer = setTimeout(() => { if (toastEl) toastEl.remove(); toastEl = null; }, extra && extra.sub ? 7000 : withUndo ? 6500 : 3500);
 }
 
 // ---- bottom sheet ----
