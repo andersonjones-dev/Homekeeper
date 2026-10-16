@@ -35,7 +35,7 @@ const A = {
   render: () => render(),
   openMenu: () => openMenu(),
   openVoice: () => openVoice(A),
-  applyTheme, scheduleNtfy, topic, ntfyTest,
+  applyTheme, reloadIfBarStale, scheduleNtfy, topic, ntfyTest,
   async copyText(t) { try { await navigator.clipboard.writeText(t); toast('Copied'); } catch (e) { toast('Copy isn’t available here'); } },
   async shareText(t) { try { if (navigator.share) await navigator.share({ text: t }); else await A.copyText(t); } catch (e) { /* cancelled */ } },
   async exportCalendar(items, alarm) {
@@ -58,6 +58,7 @@ setUndoHandler(() => { store.undo(); });
 
 // ---------- theme ----------
 const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+let shownDark = null;
 function applyTheme() {
   const pref = store.prefs.theme;
   const dark = pref === 'dark' || (pref === 'auto' && mq && mq.matches);
@@ -67,8 +68,15 @@ function applyTheme() {
   document.querySelectorAll('meta[name=theme-color]').forEach((m) => m.remove());
   const meta = document.createElement('meta'); meta.name = 'theme-color'; meta.content = colour; document.head.appendChild(meta);
   document.documentElement.style.backgroundColor = colour;
+  if (shownDark === null) shownDark = dark;
 }
-if (mq && mq.addEventListener) mq.addEventListener('change', applyTheme);
+// The phone only reads the status bar colour when the page loads, so after a real light/dark change we reload once.
+function reloadIfBarStale() {
+  const pref = store.prefs.theme;
+  const dark = pref === 'dark' || (pref === 'auto' && mq && mq.matches);
+  if (shownDark !== null && dark !== shownDark) setTimeout(() => location.reload(), 150);
+}
+if (mq && mq.addEventListener) mq.addEventListener('change', () => { applyTheme(); reloadIfBarStale(); });
 
 // ---------- routing ----------
 function route() {
