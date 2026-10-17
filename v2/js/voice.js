@@ -48,7 +48,7 @@ export function openVoice(A) {
     result.append(h('div', { class: 'voice-card' }, h('div', { class: 'voice-card-label' }, 'I understood'), h('div', { class: 'voice-card-text', 'data-testid': 'voice-summary' }, cmd.summary)),
       h('div', { class: 'form-actions' },
         h('button', { class: 'keep-btn', type: 'button', 'data-testid': 'voice-change', onclick: change }, 'Change'),
-        h('button', { class: 'primary-btn', type: 'button', 'data-testid': 'voice-confirm', onclick: () => { const msg = applyCommand(store, cmd); sheet.close(); toast(msg, cmd.kind !== 'undo'); } }, 'Do it')));
+        h('button', { class: 'primary-btn', type: 'button', 'data-testid': 'voice-confirm', onclick: () => { const msg = applyCommand(store, cmd); sheet.close(); if (cmd.kind === 'done' && A.cheer) A.cheer(cmd.coll); else toast(msg, cmd.kind !== 'undo'); } }, 'Do it')));
   }
   input.addEventListener('input', () => { if (!listening) { clearTimeout(input._t); input._t = setTimeout(understand, 500); } });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); understand(); } });
