@@ -6,6 +6,9 @@ import { buildICS } from './calendar.js';
 import { topicFromCode, reconcile, sendNow, WINDOW_HOURS } from './notify.js';
 import { icon, setUndoHandler, toast } from './ui.js';
 import { createScreens } from './screens.js';
+import { createExtras } from './extras-screens.js';
+import { digestCounts } from './extras.js';
+import { darkBg, LIGHT_BG, DEFAULT_DARK } from './themes.js';
 import { openVoice } from './voice.js';
 
 let storage;
@@ -24,7 +27,12 @@ const TABS = [
 const MENU = [
   { path: '/', label: 'Home', icon: 'home' }, { path: '/assets', label: 'Assets', icon: 'grid' }, { path: '/chores', label: 'Chores', icon: 'check-square' },
   { path: '/shopping', label: 'Shopping list', icon: 'shopping-cart' }, { path: '/bills', label: 'Bills', icon: 'credit-card' }, { path: '/reminders', label: 'Reminders', icon: 'bell' },
-  { path: '/calendar', label: 'Calendar', icon: 'calendar' }, { path: '/insights', label: 'Insights', icon: 'bar-chart-2' }, { path: '/settings', label: 'Settings', icon: 'settings' },
+  { path: '/calendar', label: 'Calendar', icon: 'calendar' }, { path: '/insights', label: 'Insights', icon: 'bar-chart-2' },
+  { section: 'MORE FOR YOUR HOME' },
+  { path: '/supplies', label: 'Supplies', icon: 'package' }, { path: '/readings', label: 'Meter readings', icon: 'activity' }, { path: '/contacts', label: 'Who to call', icon: 'phone' },
+  { path: '/vault', label: 'Home vault', icon: 'lock' }, { path: '/plants', label: 'Plants', icon: 'feather' }, { path: '/lent', label: 'Lent items', icon: 'gift' },
+  { section: 'APP' },
+  { path: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
 const A = {
@@ -59,28 +67,36 @@ async function deliverFile(name, text, type) {
   const a = h('a', { href: url, download: name }); document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
-const screens = createScreens(A);
+const base = createScreens(A);
+const extra = createExtras(A, base.kit);
+A.api = extra.api;
+const screens = Object.assign({}, base, extra);
 setUndoHandler(() => { store.undo(); });
 
 // ---------- theme ----------
 const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-let shownDark = null;
-function applyTheme() {
+let shownKey = null;
+function themeState() {
   const pref = store.prefs.theme;
   const dark = pref === 'dark' || (pref === 'auto' && mq && mq.matches);
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  const style = store.prefs.darkStyle || DEFAULT_DARK;
+  return { dark, style, key: dark ? 'dark-' + style : 'light' };
+}
+function applyTheme() {
+  const { dark, style, key } = themeState();
+  const root = document.documentElement;
+  root.setAttribute('data-theme', dark ? 'dark' : 'light');
+  root.setAttribute('data-dark', style);
   // Tell the phone about the new colour: swap in a fresh theme-color tag (iOS notices a new tag, not just a changed value).
-  const colour = dark ? '#121815' : '#F7F6F0';
+  const colour = dark ? darkBg(style) : LIGHT_BG;
   document.querySelectorAll('meta[name=theme-color]').forEach((m) => m.remove());
   const meta = document.createElement('meta'); meta.name = 'theme-color'; meta.content = colour; document.head.appendChild(meta);
-  document.documentElement.style.backgroundColor = colour;
-  if (shownDark === null) shownDark = dark;
+  root.style.backgroundColor = colour;
+  if (shownKey === null) shownKey = key;
 }
 // The phone only reads the status bar colour when the page loads, so after a real light/dark change we reload once.
 function reloadIfBarStale() {
-  const pref = store.prefs.theme;
-  const dark = pref === 'dark' || (pref === 'auto' && mq && mq.matches);
-  if (shownDark !== null && dark !== shownDark) setTimeout(() => location.reload(), 150);
+  if (shownKey !== null && themeState().key !== shownKey) setTimeout(() => location.reload(), 150);
 }
 if (mq && mq.addEventListener) mq.addEventListener('change', () => { applyTheme(); reloadIfBarStale(); });
 
@@ -105,7 +121,7 @@ function render() {
     else if (a === 'assets' && b && c === 'edit') content = screens.assetForm(b);
     else if (a === 'assets' && b) content = screens.assetDetail(b);
     else if (a === 'assets') content = screens.assets();
-    else if (screens[a] && ['chores', 'reminders', 'bills', 'shopping', 'calendar', 'insights', 'settings'].includes(a)) content = screens[a]();
+    else if (screens[a] && ['chores', 'reminders', 'bills', 'shopping', 'calendar', 'insights', 'settings', 'supplies', 'readings', 'contacts', 'vault', 'plants', 'lent'].includes(a)) content = screens[a]();
     else content = h('div', { class: 'content' }, h('div', { class: 'not-found' }, h('div', { class: 'nf-title' }, 'This screen doesn’t exist.'), h('button', { class: 'link', onclick: () => A.nav('/') }, 'Go to home screen!')));
   } catch (e) {
     console.error(e);
@@ -144,7 +160,7 @@ function openMenu() {
   const panel = h('aside', { class: 'sidebar', role: 'dialog', 'aria-label': 'Menu', 'data-testid': 'sidebar' },
     h('div', { class: 'sidebar-top' }, h('div', { class: 'brand' }, 'HOMEKEEPER'), h('button', { class: 'menu-btn small', 'aria-label': 'Close menu', onclick: close }, icon('x', 18))),
     h('div', { class: 'sidebar-title' }, 'Your home, cared for.'),
-    h('div', { class: 'sidebar-list' }, MENU.map((m) => h('button', { class: 'side-item' + ((m.path === '/' ? cur === '/' : cur.startsWith(m.path)) ? ' on' : ''), onclick: () => { close(); A.nav(m.path); }, 'data-testid': 'side-' + m.label.split(' ')[0].toLowerCase() },
+    h('div', { class: 'sidebar-list' }, MENU.map((m) => m.section ? h('div', { class: 'side-section' }, m.section) : h('button', { class: 'side-item' + ((m.path === '/' ? cur === '/' : cur.startsWith(m.path)) ? ' on' : ''), onclick: () => { close(); A.nav(m.path); }, 'data-testid': 'side-' + (m.path === '/' ? 'home' : m.path.slice(1)) },
       h('div', { class: 'side-tile' }, icon(m.icon, 18)), h('div', { class: 'side-label' }, m.label)))),
     h('div', { class: 'sidebar-foot' },
       h('button', { class: 'side-mini', onclick: () => { close(); A.openVoice(); } }, icon('mic', 16), h('span', null, 'Voice input')),
@@ -188,7 +204,7 @@ async function scheduleNtfy() {
   if (!n.on || !navigator.onLine) return;
   try {
     const t = await topic();
-    const res = await reconcile((...a) => fetch(...a), { server: n.server, topic: t, when: allWhen(store), sent: store.prefs.ntfySent || {}, opts: { lead: n.lead, hour: n.hour, now: new Date() } });
+    const res = await reconcile((...a) => fetch(...a), { server: n.server, topic: t, when: allWhen(store), sent: store.prefs.ntfySent || {}, opts: { lead: n.lead, hour: n.hour, now: new Date(), sunday: n.sunday !== false, digest: n.sunday !== false ? digestCounts(store, todayStr()) : null } });
     store.setPrefs({ ntfySent: res.sent });
     const count = Object.values(res.sent).filter((x) => x.at * 1000 > Date.now()).length;
     A.ntfyStatus = res.errors.length ? 'Couldn’t reach ntfy: ' + res.errors[0] : count + ' reminder' + (count === 1 ? '' : 's') + ' scheduled for the next ' + WINDOW_HOURS + ' hours';
