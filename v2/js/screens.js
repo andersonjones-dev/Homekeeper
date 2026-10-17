@@ -10,6 +10,8 @@ import {
 } from './ui.js';
 import { buildICS } from './calendar.js';
 import { celebration, ownership } from './delight.js';
+import { extraAttention } from './extras.js';
+import { DARK_STYLES } from './themes.js';
 import { topicFromCode } from './notify.js';
 
 export function createScreens(A) {
@@ -36,8 +38,8 @@ export function createScreens(A) {
       if (['text', 'amount', 'date', 'notes'].includes(f.kind)) {
         control = TextInput({
           label: f.label, value: v[f.key] == null || v[f.key] === 0 && f.kind === 'amount' ? '' : String(v[f.key]), placeholder: f.placeholder,
-          type: f.kind === 'date' ? 'date' : 'text', inputmode: f.kind === 'amount' ? 'decimal' : undefined, multiline: f.kind === 'notes',
-          autocapitalize: f.kind === 'text' || f.kind === 'notes' ? 'sentences' : 'none', onInput: (x) => { v[f.key] = x; }, testid: 'field-' + f.key,
+          type: f.kind === 'date' ? 'date' : (f.type || 'text'), inputmode: f.inputmode || (f.kind === 'amount' ? 'decimal' : undefined), multiline: f.kind === 'notes',
+          autocapitalize: f.autocapitalize || (f.kind === 'text' || f.kind === 'notes' ? 'sentences' : 'none'), onInput: (x) => { v[f.key] = x; }, testid: 'field-' + f.key,
           onEnter: f.kind === 'text' && f.enterSaves ? () => save() : undefined,
         });
         inputs[f.key] = control;
@@ -86,16 +88,20 @@ export function createScreens(A) {
   const withToast = (msg) => toast(msg, true);
   let lastCheer = 0;
   // Pop-up after something is completed: a plain confirmation every time, an occasional quip, a note when you are all caught up.
-  const cheer = (coll) => {
+  const cheer = (coll, opts) => {
     const t = today();
     const wkStart = windowRange(t, 7, 0)[0];
     const c = celebration(coll, {
-      fun: store.prefs.fun !== false, remaining: attention(t).length, now: Date.now(), lastAt: lastCheer,
+      fun: store.prefs.fun !== false,
+      remaining: coll === 'shopping' ? store.live('shopping').filter((i) => !i.bought).length : attention(t).length,
+      now: Date.now(), lastAt: lastCheer,
       doneThisWeek: store.live('chores').filter((x) => x.done && x.doneAt >= wkStart).length,
     });
+    if (opts && opts.sub) c.sub = opts.sub;
     if (c.sub) lastCheer = Date.now();
     toast(c.title, true, c);
   };
+  A.cheer = cheer;
 
   // ---------- HOME ----------
   function home() {
@@ -119,6 +125,7 @@ export function createScreens(A) {
           metric(assets.length, assets.length === 1 ? 'saved asset' : 'saved assets'), h('div', { class: 'metric-divider' }),
           metric(weekCount, 'due this week'), h('div', { class: 'metric-divider' }),
           metric(upcoming.length, 'warranty watch'))),
+      A.api.sundayCard(dueItems),
       dueItems.length ? attentionCard(dueItems) : null,
       SectionHeader('Upcoming maintenance', 'Warranty milestones in the next 90 days', upcoming.length ? h('div', { class: 'count-badge' }, upcoming.length) : null),
       upcoming.length
@@ -146,7 +153,7 @@ export function createScreens(A) {
     for (const c of store.live('chores')) if (!c.done && c.due) out.push({ coll: 'chores', id: c.id, title: c.title, sub: c.assignee || 'Chore', due: c.due, tile: 'check-square' });
     for (const r of store.live('reminders')) if (!r.done && r.due) out.push({ coll: 'reminders', id: r.id, title: r.title, sub: 'Reminder', due: r.due, tile: 'bell' });
     for (const b of store.live('bills')) if (!b.paid && b.due) out.push({ coll: 'bills', id: b.id, title: b.name, sub: b.amount ? money(b.amount) : 'Bill', due: b.due, tile: 'credit-card' });
-    return out.map((x) => Object.assign(x, { days: daysFromToday(x.due, t) })).filter((x) => x.days <= 7).sort((a, b) => a.days - b.days);
+    return out.concat(extraAttention(store, t)).map((x) => Object.assign(x, { days: daysFromToday(x.due, t) })).filter((x) => x.days <= 7).sort((a, b) => a.days - b.days);
   }
   function attentionCard(items) {
     const top = items.slice(0, 5);
@@ -154,7 +161,7 @@ export function createScreens(A) {
       SectionHeader('Needs attention', 'Overdue or due in the next 7 days', h('div', { class: 'count-badge' }, items.length)),
       h('div', { class: 'upcoming-card', 'data-testid': 'attention-card' }, top.map((x, i) =>
         h('div', { class: 'att-row' + (i < top.length - 1 ? ' bb' : '') },
-          CheckCircle(false, () => { x.coll === 'chores' || x.coll === 'reminders' || x.coll === 'bills' ? store.setDone(x.coll, x.id, true) : null; cheer(x.coll); }, 'Mark done'),
+          CheckCircle(false, () => A.api.completeItem(x), 'Mark done'),
           h('button', { class: 'att-main', onclick: () => A.nav('/' + x.coll) },
             h('div', { class: 'upcoming-name' }, x.title), h('div', { class: 'upcoming-date' }, x.sub)),
           h('div', { class: 'days-left' + (x.days < 0 ? ' overdue' : '') }, x.days < 0 ? Math.abs(x.days) + 'd late' : x.days === 0 ? 'Today' : x.days + 'd')))),
@@ -176,7 +183,7 @@ export function createScreens(A) {
     if (id && !a) return notFound();
     const key = 'asset-' + (id || 'new');
     if (!forms[key]) {
-      const v = { name: a ? a.name : '', category: a ? a.category : '', brand: a ? a.brand : '', purchaseDate: a ? a.purchaseDate : '', price: a && a.price ? String(a.price) : '', warrantyExpiry: a ? a.warrantyExpiry : '', notes: a ? a.notes : '', cal: a ? a.cal : undefined, ntf: a ? a.ntf : undefined };
+      const v = { name: a ? a.name : '', category: a ? a.category : '', brand: a ? a.brand : '', serial: a && a.serial ? a.serial : '', purchaseDate: a ? a.purchaseDate : '', price: a && a.price ? String(a.price) : '', warrantyExpiry: a ? a.warrantyExpiry : '', notes: a ? a.notes : '', cal: a ? a.cal : undefined, ntf: a ? a.ntf : undefined };
       const errors = {};
       const eb = {};
       const errEl = (k) => (eb[k] = h('div', { class: 'field-error', role: 'alert', hidden: true }));
@@ -191,6 +198,7 @@ export function createScreens(A) {
         TextInput({ label: 'Asset name', value: v.name, placeholder: 'e.g. Living room air conditioner', onInput: (x) => { v.name = x; }, testid: 'asset-name-input' }), errEl('name'),
         h('label', { class: 'label' }, 'Category *'), catWrap, errEl('category'),
         h('label', { class: 'label' }, 'Brand'), TextInput({ label: 'Brand', value: v.brand, placeholder: 'e.g. Bosch', autocapitalize: 'words', onInput: (x) => { v.brand = x; }, testid: 'asset-brand-input' }),
+        h('label', { class: 'label' }, 'Model / serial number'), TextInput({ label: 'Model or serial number', value: v.serial, placeholder: 'Handy for warranty claims', autocapitalize: 'characters', onInput: (x) => { v.serial = x; }, testid: 'asset-serial-input' }),
         h('label', { class: 'label' }, 'Purchase date'), TextInput({ label: 'Purchase date', type: 'date', value: v.purchaseDate, onInput: (x) => { v.purchaseDate = x; }, testid: 'asset-purchase-date-input' }), errEl('purchaseDate'),
         h('label', { class: 'label' }, 'Purchase price (optional)'), TextInput({ label: 'Purchase price', value: v.price, placeholder: 'e.g. 45000', inputmode: 'decimal', onInput: (x) => { v.price = x; }, testid: 'asset-price-input' }), errEl('price'),
         h('label', { class: 'label' }, 'Warranty expiry'), TextInput({ label: 'Warranty expiry date', type: 'date', value: v.warrantyExpiry, onInput: (x) => { v.warrantyExpiry = x; }, testid: 'asset-warranty-date-input' }), errEl('warrantyExpiry'),
@@ -209,7 +217,7 @@ export function createScreens(A) {
           if (v.price.trim() && parseAmount(v.price) === null) bad('price', 'Enter the price as a number, e.g. 45000.');
           if (pd && we && isValidDate(pd) && isValidDate(we) && we < pd) bad('warrantyExpiry', 'Warranty expiry must be after the purchase date.');
           if (Object.keys(errors).length) return;
-          const fields = { name, category: v.category, brand: v.brand.trim(), purchaseDate: pd, price: parseAmount(v.price) || 0, warrantyExpiry: we, notes: v.notes.trim(), cal: v.cal, ntf: v.ntf };
+          const fields = { name, category: v.category, brand: v.brand.trim(), serial: v.serial.trim(), purchaseDate: pd, price: parseAmount(v.price) || 0, warrantyExpiry: we, notes: v.notes.trim(), cal: v.cal, ntf: v.ntf };
           let newId = id;
           store.mutate(a ? 'Asset updated' : 'Asset added', (tx) => {
             if (a) tx.patch('assets', id, fields); else newId = tx.add('assets', fields).id;
@@ -265,6 +273,7 @@ export function createScreens(A) {
       h('div', { class: 'detail-title' }, 'Details'),
       h('div', { class: 'details-card' },
         row('Category', a.category, 'grid'), row('Brand', a.brand || 'Not added', 'tag'),
+        a.serial ? row('Model / serial', a.serial, 'file-text') : null,
         row('Purchase date', a.purchaseDate ? formatDate(a.purchaseDate) : 'Not added', 'shopping-bag'),
         row('Warranty expiry', a.warrantyExpiry ? formatDate(a.warrantyExpiry) : 'Not added', 'calendar', !a.notes),
         a.notes ? h('div', { class: 'notes-block' }, h('div', { class: 'notes-title' }, icon('file-text', 15, 'muted'), h('div', { class: 'detail-label' }, 'Notes')), h('div', { class: 'notes-text' }, a.notes)) : null),
@@ -279,6 +288,7 @@ export function createScreens(A) {
         : h('div', { class: 'quiet-card' }, h('div', { class: 'quiet-icon' }, icon('tool', 18)), h('div', { class: 'quiet-copy' }, h('div', { class: 'quiet-title' }, 'No repairs logged'), h('div', { class: 'quiet-text' }, 'Log a service or repair to track what this costs you over time.'))),
       services.length ? h('div', { class: 'total-line' }, 'Total spent: ', h('b', null, money(total))) : null,
       ownershipCard(own),
+      A.api.documents(id, a, services),
       conf
         ? h('div', { class: 'confirm-card', role: 'alert' },
           h('div', { class: 'confirm-title' }, 'Remove ' + a.name + '?'),
@@ -319,6 +329,7 @@ export function createScreens(A) {
     return screen(
       hdr({ eyebrow: 'HOUSEHOLD', title: 'Chores', subtitle: all.filter((c) => !c.done).length + ' to do', action: { label: 'Add a chore', onClick: () => openForm('chore-new', () => choreForm(null, names)), testid: 'chores-add-button' } }),
       forms['chore-new'] || null,
+      h('button', { class: 'season-link', onclick: () => A.api.seasonalSheet(), 'data-testid': 'seasonal-open' }, icon('sunrise', 16), h('span', null, 'Seasonal checklists'), icon('chevron-right', 16)),
       Segmented([{ value: 'todo', label: 'To do' }, { value: 'done', label: 'Done' }], ui.choreTab, (v) => { ui.choreTab = v; A.render(); }),
       names.length ? h('div', { class: 'chips filter' }, [Chip('Everyone', !ui.choreWho, () => { ui.choreWho = ''; A.render(); })].concat(names.map((n) => Chip(n, ui.choreWho === n, () => { ui.choreWho = n; A.render(); })))) : null,
       list.length
@@ -487,7 +498,7 @@ export function createScreens(A) {
   function shopRow(i) {
     if (ui.shopEdit === i.id && forms['shop-edit-form']) return forms['shop-edit-form'];
     return Row({
-      left: CheckCircle(i.bought, () => { store.setBought(i.id, !i.bought); }, 'Mark bought'),
+      left: CheckCircle(i.bought, () => { const was = i.bought; store.setBought(i.id, !was); if (!was) cheer('shopping'); }, 'Mark bought'),
       title: i.name, done: i.bought,
       right: i.qty ? h('div', { class: 'qty-pill' }, i.qty) : null,
       onClick: () => { ui.shopEdit = i.id; forms['shop-edit-form'] = shopEditForm(i); A.render(); },
@@ -508,7 +519,7 @@ export function createScreens(A) {
   }
 
   // ---------- CALENDAR ----------
-  const KIND_LABEL = { chores: 'Chore', bills: 'Bill', reminders: 'Reminder', warranties: 'Warranty' };
+  const KIND_LABEL = { chores: 'Chore', bills: 'Bill', reminders: 'Reminder', warranties: 'Warranty', supplies: 'Supply' };
   function calendar() {
     const t = today();
     const all = allWhen(store).filter((w) => w.date >= t && (ui.calRange === 'all' || w.date <= addDays(t, 90)));
@@ -567,6 +578,7 @@ export function createScreens(A) {
           h('div', { class: 'summary-metric' }, h('div', { class: 'summary-number' }, money(q.cur)), h('div', { class: 'metric-label' }, 'this quarter')),
           h('div', { class: 'metric-divider' }),
           h('div', { class: 'summary-metric' }, h('div', { class: 'summary-number sm' }, money(q.prev)), h('div', { class: 'metric-label' }, q.prev || q.cur ? 'before that (' + chg(q.cur, q.prev) + ')' : 'before that')))),
+      A.api.insightsExtra(),
       replaceList.length ? h('div', { class: 'info-card warn', 'data-testid': 'replace-list' }, icon('alert-circle', 18, 'destructive'), h('div', null, replaceList.map((r) => h('div', null, r.name + ': repairs are ' + Math.round(r.share * 100) + '% of the purchase price. Maybe time to replace.')))) : null,
       rising.length ? h('div', { class: 'info-card warn', 'data-testid': 'rising' }, icon('trending-up', 18, 'destructive'), h('div', null, rising.slice(0, 3).map((r) => h('div', null, h('b', null, r.key), ' cost ' + money(r.cur) + ' this quarter, up ' + Math.round(((r.cur - r.prev) / r.prev) * 100) + '% from ' + money(r.prev) + ' last quarter.')))) : null,
       SectionHeader('By category', 'Paid bills and repairs'),
@@ -591,7 +603,7 @@ export function createScreens(A) {
   function settings() {
     const s = store.shared, p = store.prefs;
     const cd = s.calDefaults, nd = s.ntfDefaults;
-    const kinds = [['chores', 'Chores'], ['bills', 'Bills'], ['reminders', 'Reminders'], ['warranties', 'Warranty dates']];
+    const kinds = [['chores', 'Chores'], ['bills', 'Bills'], ['reminders', 'Reminders'], ['warranties', 'Warranty dates'], ['supplies', 'Supplies to book']];
     const syncOn = A.sync.enabled();
     const topicEl = h('div', { class: 'mono', 'data-testid': 'ntfy-topic' }, '…');
     A.topic().then((tp) => { topicEl.textContent = tp; });
@@ -612,6 +624,8 @@ export function createScreens(A) {
       hdr({ eyebrow: 'PREFERENCES', title: 'Settings', subtitle: 'Make HomeKeeper yours' }),
       Card('Appearance', 'Light, dark, or match your phone',
         Segmented([{ value: 'auto', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }], p.theme, (v) => { store.setPrefs({ theme: v }); A.applyTheme(); A.render(); A.reloadIfBarStale(); }),
+          h('div', { class: 'label inline' }, 'Dark style'),
+          h('div', { class: 'dark-styles', 'data-testid': 'dark-styles' }, Object.entries(DARK_STYLES).map(([k, d]) => h('button', { class: 'dark-style' + ((p.darkStyle || 'midnight') === k ? ' on' : ''), 'aria-pressed': (p.darkStyle || 'midnight') === k, 'data-testid': 'dark-' + k, onclick: () => { store.setPrefs({ darkStyle: k }); A.applyTheme(); A.render(); A.reloadIfBarStale(true); } }, h('span', { class: 'dark-dot', style: 'background:' + d.dot + ';box-shadow:inset 0 0 0 6px ' + d.bg }), h('span', null, d.label)))),
           h('div', { class: 'hint left' }, 'The app reloads once when the theme changes, so the phone’s status bar colour can follow it.')),
       Card('Fun messages', 'A little cheer when you finish something',
         h('div', { class: 'details-card' }, SetRow('Show pop-up cheers and the odd joke', null, Switch(p.fun !== false, (v) => store.setPrefs({ fun: v }), 'Fun messages'), true))),
@@ -632,6 +646,7 @@ export function createScreens(A) {
           ChipGroup([7, 8, 9, 12, 18, 20].map((x) => ({ value: x, label: x < 12 ? x + ' am' : x === 12 ? '12 pm' : (x - 12) + ' pm' })), p.ntfy.hour, (v) => { store.setPrefs({ ntfy: Object.assign({}, store.prefs.ntfy, { hour: v }) }); A.scheduleNtfy(); }),
           h('div', { class: 'label inline' }, 'Notify for'),
           kinds.map(([k, l]) => SetRow(l, null, Switch(nd[k], (v) => store.setShared({ ntfDefaults: Object.assign({}, nd, { [k]: v }) }), l), true)),
+          SetRow('Sunday reset message', 'Sunday 6 pm: what is overdue and due this week', Switch(p.ntfy.sunday !== false, (v) => { store.setPrefs({ ntfy: Object.assign({}, store.prefs.ntfy, { sunday: v }) }); A.scheduleNtfy(); A.render(); }, 'Sunday reset message'), true),
           testBtn, ntfyStatus,
           h('div', { class: 'hint left' }, 'ntfy holds each reminder on its server until the right time, so it arrives even when this app is closed. It can only hold reminders about two days ahead, so open HomeKeeper every day or two to keep them topped up.'))),
       Card('Family sync', 'Share everything with your partner',
@@ -653,5 +668,6 @@ export function createScreens(A) {
       h('div', { class: 'footer-note' }, 'HomeKeeper · all data lives on your phone unless you turn on family sync.'));
   }
 
-  return { home, assets, assetForm, assetDetail, chores, reminders, bills, shopping, calendar, insights, settings, notFound, clearForms };
+  const kit = { ItemForm, forms, openForm, closeForm, hdr, screen, money, today, withToast, cheer, ui, calTri, ntfTri };
+  return { home, assets, assetForm, assetDetail, chores, reminders, bills, shopping, calendar, insights, settings, notFound, clearForms, kit };
 }
