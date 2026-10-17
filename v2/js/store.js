@@ -1,7 +1,8 @@
 // Data store: local persistence, undo, repeat-spawning and last-write-wins merge for family sync.
-import { uid, todayStr, nextOccurrence, nextOccurrenceFromToday } from './util.js';
+import { uid, todayStr, nextOccurrence, nextOccurrenceFromToday, formatDate } from './util.js';
+import { predictSupply } from './extras.js';
 
-export const COLLS = ['assets', 'services', 'chores', 'shopping', 'bills', 'reminders'];
+export const COLLS = ['assets', 'services', 'chores', 'shopping', 'bills', 'reminders', 'supplies', 'readings', 'contacts', 'vault', 'lent', 'plants'];
 export const ASSET_CATEGORIES = ['Air conditioning', 'Kitchen', 'Laundry', 'Heating', 'Plumbing', 'Electrical', 'Other'];
 export const SHOP_CATEGORIES = ['Groceries', 'Vegetables & fruit', 'Dairy', 'Household', 'Toiletries', 'Other'];
 export const BILL_TYPES = ['Electricity', 'Gas cylinder', 'Broadband', 'Water', 'Mobile', 'Rent', 'Other'];
@@ -9,17 +10,18 @@ const TOMBSTONE_DAYS = 60;
 
 export const DEFAULT_SHARED = () => ({
   currency: '₹',
-  calDefaults: { chores: false, bills: true, reminders: true, warranties: true },
-  ntfDefaults: { chores: true, bills: true, reminders: true, warranties: false },
+  calDefaults: { chores: false, bills: true, reminders: true, warranties: true, supplies: false },
+  ntfDefaults: { chores: true, bills: true, reminders: true, warranties: false, supplies: true },
   updatedAt: 0,
 });
 export const DEFAULT_PREFS = () => ({
   theme: 'auto',
   fun: true,
+  darkStyle: 'midnight',
   name: '',
   familyCode: '',
   deviceId: uid(),
-  ntfy: { on: false, server: 'https://ntfy.sh', lead: 'both', hour: 9 },
+  ntfy: { on: false, server: 'https://ntfy.sh', lead: 'both', hour: 9, sunday: true },
   syncEndpoint: '',
   lastSync: 0,
   ntfySent: {},
@@ -264,12 +266,13 @@ export function itemWhen(coll, it, shared) {
   if (coll === 'chores' && !it.done && it.due) return { id: it.id, title: it.title + (it.assignee ? ' (' + it.assignee + ')' : ''), date: it.due, kind: 'chores', onCal: it.cal ?? cd.chores, onNtf: it.ntf ?? nd.chores, notes: '' };
   if (coll === 'reminders' && !it.done && it.due) return { id: it.id, title: it.title, date: it.due, kind: 'reminders', onCal: it.cal ?? cd.reminders, onNtf: it.ntf ?? nd.reminders, notes: it.notes || '' };
   if (coll === 'bills' && !it.paid && it.due) return { id: it.id, title: 'Pay ' + it.name + (it.amount ? ' (' + it.amount + ')' : ''), date: it.due, kind: 'bills', onCal: it.cal ?? cd.bills, onNtf: it.ntf ?? nd.bills, notes: it.notes || '' };
+  if (coll === 'supplies') { const p = predictSupply(it, todayStr()); if (p && p.bookBy) return { id: it.id, title: 'Book ' + it.name, date: p.bookBy, kind: 'supplies', onCal: it.cal ?? cd.supplies ?? false, onNtf: it.ntf ?? nd.supplies ?? true, notes: 'Expected about ' + formatDate(p.next) }; return null; }
   if (coll === 'assets' && it.warrantyExpiry) return { id: it.id, title: 'Warranty ends: ' + it.name, date: it.warrantyExpiry, kind: 'warranties', onCal: it.cal ?? cd.warranties, onNtf: it.ntf ?? nd.warranties, notes: it.brand || '' };
   return null;
 }
 export function allWhen(store) {
   const out = [];
-  for (const c of ['chores', 'reminders', 'bills', 'assets']) {
+  for (const c of ['chores', 'reminders', 'bills', 'supplies', 'assets']) {
     for (const it of store.live(c)) {
       const w = itemWhen(c, it, store.shared);
       if (w) out.push(Object.assign(w, { coll: c }));
