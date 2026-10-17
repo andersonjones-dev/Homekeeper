@@ -7,6 +7,7 @@ import { topicFromCode, reconcile, sendNow, WINDOW_HOURS } from './notify.js';
 import { icon, setUndoHandler, toast } from './ui.js';
 import { createScreens } from './screens.js';
 import { createExtras } from './extras-screens.js';
+import { loadIndex } from './photos.js';
 import { digestCounts } from './extras.js';
 import { darkBg, LIGHT_BG, DEFAULT_DARK } from './themes.js';
 import { openVoice } from './voice.js';
@@ -30,7 +31,7 @@ const MENU = [
   { path: '/calendar', label: 'Calendar', icon: 'calendar' }, { path: '/insights', label: 'Insights', icon: 'bar-chart-2' },
   { section: 'MORE FOR YOUR HOME' },
   { path: '/supplies', label: 'Supplies', icon: 'package' }, { path: '/readings', label: 'Meter readings', icon: 'activity' }, { path: '/contacts', label: 'Who to call', icon: 'phone' },
-  { path: '/vault', label: 'Home vault', icon: 'lock' }, { path: '/plants', label: 'Plants', icon: 'feather' }, { path: '/lent', label: 'Lent items', icon: 'gift' },
+  { path: '/files', label: 'Documents', icon: 'paperclip' }, { path: '/vault', label: 'Home vault', icon: 'lock' }, { path: '/plants', label: 'Plants', icon: 'feather' }, { path: '/lent', label: 'Lent items', icon: 'gift' },
   { section: 'APP' },
   { path: '/settings', label: 'Settings', icon: 'settings' },
 ];
@@ -70,6 +71,7 @@ async function deliverFile(name, text, type) {
 const base = createScreens(A);
 const extra = createExtras(A, base.kit);
 A.api = extra.api;
+A.refreshClips = () => { const ae = document.activeElement; if (!(ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName))) render(); };
 const screens = Object.assign({}, base, extra);
 setUndoHandler(() => { store.undo(); });
 
@@ -121,7 +123,7 @@ function render() {
     else if (a === 'assets' && b && c === 'edit') content = screens.assetForm(b);
     else if (a === 'assets' && b) content = screens.assetDetail(b);
     else if (a === 'assets') content = screens.assets();
-    else if (screens[a] && ['chores', 'reminders', 'bills', 'shopping', 'calendar', 'insights', 'settings', 'supplies', 'readings', 'contacts', 'vault', 'plants', 'lent'].includes(a)) content = screens[a]();
+    else if (screens[a] && ['chores', 'reminders', 'bills', 'shopping', 'calendar', 'insights', 'settings', 'supplies', 'readings', 'contacts', 'vault', 'plants', 'lent', 'files'].includes(a)) content = screens[a]();
     else content = h('div', { class: 'content' }, h('div', { class: 'not-found' }, h('div', { class: 'nf-title' }, 'This screen doesn’t exist.'), h('button', { class: 'link', onclick: () => A.nav('/') }, 'Go to home screen!')));
   } catch (e) {
     console.error(e);
@@ -217,5 +219,7 @@ applyTheme();
 render();
 topic();
 doSync().then(() => scheduleNtfy());
+// Documents live in IndexedDB: count them for the paperclips, drop files whose item is gone, then count again.
+loadIndex().then(() => { render(); return A.api.sweepFiles(); }).then(() => loadIndex()).then(() => render()).catch(() => {});
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 window.__hk = { store, A }; // handy for debugging and tests
