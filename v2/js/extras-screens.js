@@ -6,7 +6,7 @@ import {
   predictSupply, withRefill, supplyLine, meterTrend, readingSegments, choreTally, SEASONS, seasonChores, plantStatus, lentStatus,
   claimPackText, wifiString, phoneDigits, whatsappNumber,
 } from './extras.js';
-import { addPhoto, listPhotos, deletePhoto } from './photos.js';
+import { addFile, listFiles, listAll, deleteFile, sweep, fileCount, totals } from './photos.js';
 import { makeQR } from './qr.js';
 
 export function createExtras(A, kit) {
@@ -296,43 +296,134 @@ export function createExtras(A, kit) {
     if (x.coll === 'supplies') logRefill(it); else if (x.coll === 'plants') water(it); else if (x.coll === 'lent') markReturned(it);
   }
 
-  // ================= photos on assets =================
+  // ================= documents and photos (assets, bills, reminders, repairs) =================
   let urls = [];
-  function documents(id, a, services) {
-    urls.forEach((u) => URL.revokeObjectURL(u)); urls = [];
+  const sizeText = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+  const fileName = (name, f) => (name || 'item').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '') + '-' + f.name.replace(/[^\w.-]+/g, '-');
+  const toFile = (rec, base) => new File([rec.blob], base ? fileName(base, rec) : rec.name, { type: rec.type });
+  async function shareOrSave(rec, title) {
+    const f = toFile(rec);
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: title || rec.name }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    const u = URL.createObjectURL(rec.blob); const a = h('a', { href: u, download: rec.name }); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000);
+  }
+  function viewFile(rec, title, onChange) {
+    const u = URL.createObjectURL(rec.blob); urls.push(u);
+    const img = rec.type.startsWith('image/');
+    const sheet = openSheet(title, h('div', { class: 'viewer', 'data-testid': 'file-viewer' },
+      img ? h('img', { src: u, alt: rec.name }) : h('div', { class: 'filecard' }, icon('file-text', 28), h('div', { class: 'fc-name' }, rec.name), h('div', { class: 'fc-size' }, sizeText(rec.size || rec.blob.size))),
+      h('div', { class: 'btn-row' },
+        !img ? h('a', { class: 'keep-btn wide', href: u, target: '_blank', rel: 'noopener', 'data-testid': 'file-open' }, icon('file-text', 16), h('span', null, 'Open')) : null,
+        h('button', { class: 'keep-btn wide', onclick: () => shareOrSave(rec, title), 'data-testid': 'file-share' }, icon('send', 16), h('span', null, 'Share or save'))),
+      h('button', { class: 'delete-btn', 'data-testid': 'file-delete', onclick: async () => { try { await deleteFile(rec); } catch (e) { /* ignore */ } sheet.close(); toast('Removed'); if (onChange) onChange(); } }, icon('trash-2', 17), h('span', null, 'Delete'))));
+  }
+  // Add / view documents for one item. owner is like "bills:abc". Files stay on this phone.
+  function attachments(owner, o) {
+    o = o || {};
     const strip = h('div', { class: 'thumbs', 'data-testid': 'thumbs' });
-    const input = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, 'data-testid': 'photo-input' });
-    let photos = [];
-    const status = h('div', { class: 'hint left' }, 'Photos stay on this phone only. They are not sent through Family sync.');
-    async function refresh() {
-      try { photos = await listPhotos(id); } catch (e) { status.textContent = String(e.message || e); photos = []; }
-      strip.replaceChildren(...photos.map((p, i) => { const u = URL.createObjectURL(p.blob); urls.push(u); return h('button', { class: 'thumb', 'aria-label': 'Open photo ' + (i + 1), onclick: () => viewer(p, u) }, h('img', { src: u, alt: 'Photo ' + (i + 1) })); }));
-      shareBtn.disabled = false;
-    }
-    function viewer(p, u) {
-      const sheet = openSheet(a.name + ' photo', h('div', { class: 'viewer' }, h('img', { src: u, alt: 'Photo' }),
-        h('button', { class: 'delete-btn', onclick: async () => { try { await deletePhoto(p.id); } catch (e) { /* ignore */ } sheet.close(); refresh(); toast('Photo removed'); } }, icon('trash-2', 17), h('span', null, 'Delete photo'))));
+    const input = h('input', { type: 'file', accept: 'image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.txt', multiple: true, hidden: true, 'data-testid': 'photo-input' });
+    const note = o.hint || 'Photos and PDFs stay on this phone only. They are not sent through Family sync.';
+    const status = h('div', { class: 'hint left' }, note);
+    let files = [];
+    async function refresh(notify) {
+      try { files = await listFiles(owner); } catch (e) { status.textContent = String(e.message || e); files = []; }
+      strip.replaceChildren(...files.map((f, i) => {
+        if (f.type.startsWith('image/')) { const u = URL.createObjectURL(f.blob); urls.push(u); return h('button', { class: 'thumb', type: 'button', 'aria-label': 'Open ' + f.name, onclick: () => viewFile(f, o.title || 'Document', () => refresh(true)) }, h('img', { src: u, alt: f.name })); }
+        return h('button', { class: 'filechip', type: 'button', 'aria-label': 'Open ' + f.name, onclick: () => viewFile(f, o.title || 'Document', () => refresh(true)) }, icon('file-text', 20), h('span', { class: 'fc-name' }, f.name), h('span', { class: 'fc-size' }, sizeText(f.size || f.blob.size)));
+      }));
+      if (o.onList) o.onList(files);
+      if (notify && o.onChange) o.onChange(files);
     }
     input.addEventListener('change', async () => {
-      const files = [...input.files]; input.value = '';
-      for (const f of files) { try { status.textContent = 'Saving photo…'; await addPhoto(id, f); } catch (e) { status.textContent = String(e.message || e); await refresh(); return; } }
-      status.textContent = 'Photos stay on this phone only. They are not sent through Family sync.'; await refresh(); toast(files.length === 1 ? 'Photo saved' : files.length + ' photos saved');
+      const picked = [...input.files]; input.value = '';
+      let saved = 0;
+      for (const f of picked) {
+        try { status.textContent = 'Saving ' + (f.name || 'file') + '…'; await addFile(owner, f); saved++; } catch (e) { status.textContent = String(e.message || e); await refresh(); return; }
+      }
+      status.textContent = note; await refresh(true); if (saved) toast(saved === 1 ? 'Saved' : saved + ' files saved');
     });
+    const wrap = h('div', { class: 'docs', 'data-testid': 'docs' },
+      h('div', { class: 'detail-title with-action' }, h('span', null, o.heading || 'Documents & photos'), h('button', { class: 'view-all', type: 'button', onclick: () => input.click(), 'data-testid': 'add-photo' }, '+ Add')),
+      strip, input, status);
+    refresh();
+    wrap.getFiles = () => files;
+    return wrap;
+  }
+  // Documents block on an asset page, with a one-tap "share claim pack" for warranty claims.
+  function documents(id, a, services) {
+    urls.forEach((u) => URL.revokeObjectURL(u)); urls = [];
+    let current = [];
     const shareBtn = h('button', { class: 'keep-btn wide', 'data-testid': 'share-claim', onclick: async () => {
       const text = claimPackText(a, services, store.shared.currency);
-      const files = photos.map((p, i) => new File([p.blob], (a.name || 'item').replace(/[^\w-]+/g, '-') + '-' + (i + 1) + '.jpg', { type: 'image/jpeg' }));
+      let files = current.map((r) => toFile(r, a.name));
       try {
+        if (files.length && navigator.canShare && !navigator.canShare({ files })) files = files.filter((f) => navigator.canShare({ files: [f] }));
         if (files.length && navigator.canShare && navigator.canShare({ files })) await navigator.share({ title: 'Warranty claim: ' + a.name, text, files });
         else if (navigator.share) await navigator.share({ title: 'Warranty claim: ' + a.name, text });
         else await A.copyText(text);
       } catch (e) { if (!e || e.name !== 'AbortError') A.copyText(text); }
-    } }, icon('send', 16), h('span', null, 'Share claim details'));
-    const wrap = h('div', { class: 'docs', 'data-testid': 'docs' },
-      h('div', { class: 'detail-title with-action' }, h('span', null, 'Invoice & photos'), h('button', { class: 'view-all', onclick: () => input.click(), 'data-testid': 'add-photo' }, '+ Add')),
-      strip, input, status, shareBtn);
-    refresh();
+    } }, icon('send', 16), h('span', null, 'Share claim pack'));
+    const wrap = attachments('assets:' + id, { heading: 'Warranty card, invoice & photos', title: a.name, onList: (f) => { current = f; }, onChange: () => { if (A.refreshClips) A.refreshClips(); } });
+    wrap.append(shareBtn);
     return wrap;
   }
+  // Paperclip shown on list rows that have documents.
+  function clip(owner) {
+    const n = fileCount(owner);
+    return n ? h('span', { class: 'clip', 'aria-label': n + ' document' + (n === 1 ? '' : 's') }, icon('paperclip', 12), String(n)) : null;
+  }
+  // For forms of new items: the id is made up front so files can be attached before the first save.
+  function discardNew(owner) { listFiles(owner).then((fs) => Promise.all(fs.map((f) => deleteFile(f)))).catch(() => {}); }
+
+  // ---- all documents ----
+  function ownerInfo(owner) {
+    const [coll, id] = owner.split(':');
+    const it = store.get(coll, id);
+    if (!it) return null;
+    if (coll === 'assets') return { title: it.name, kind: 'Asset', path: '/assets/' + id };
+    if (coll === 'bills') return { title: it.name, kind: 'Bill', path: '/bills' };
+    if (coll === 'reminders') return { title: it.title, kind: 'Reminder', path: '/reminders' };
+    if (coll === 'services') { const as = store.get('assets', it.assetId); return { title: (it.desc || 'Service') + (as ? ' · ' + as.name : ''), kind: 'Repair', path: as ? '/assets/' + as.id : '/assets' }; }
+    return null;
+  }
+  function liveOwners() {
+    const out = new Set();
+    ['assets', 'bills', 'reminders', 'services'].forEach((c) => store.live(c).forEach((x) => out.add(c + ':' + x.id)));
+    return out;
+  }
+  const filesUi = { all: [], q: '', type: 'all', loaded: false };
+  function files() {
+    urls.forEach((u) => URL.revokeObjectURL(u)); urls = [];
+    const list = h('div', { class: 'list', 'data-testid': 'files-list' });
+    const empty = EmptyCard({ icon: 'file-text', title: 'No documents yet', text: 'Open an asset, bill, reminder or repair and tap “+ Add” to keep a warranty card, invoice or paper bill here.' });
+    const search = h('input', { class: 'input', placeholder: 'Search documents', 'aria-label': 'Search documents', value: filesUi.q, 'data-testid': 'files-search' });
+    const count = h('div', { class: 'hint left' }, '');
+    function draw() {
+      const q = filesUi.q.trim().toLowerCase();
+      const rows = filesUi.all.map((f) => ({ f, info: ownerInfo(f.owner) })).filter((x) => x.info)
+        .filter((x) => (filesUi.type === 'all' || (filesUi.type === 'pdf' ? !x.f.type.startsWith('image/') : x.f.type.startsWith('image/'))))
+        .filter((x) => !q || (x.info.title + ' ' + x.info.kind + ' ' + x.f.name).toLowerCase().includes(q));
+      list.replaceChildren(...rows.map(({ f, info }) => Row({
+        tile: f.type.startsWith('image/') ? 'image' : 'file-text', title: info.title, sub: info.kind + ' · ' + f.name + ' · ' + sizeText(f.size || f.blob.size) + ' · ' + formatDate(new Date(f.at).toISOString().slice(0, 10)),
+        onClick: () => viewFile(f, info.title, load),
+        right: h('button', { class: 'view-all', type: 'button', onclick: () => A.nav(info.path) }, 'Go to'),
+      })));
+      empty.hidden = filesUi.all.length > 0; list.hidden = rows.length === 0; const t = totals();
+      count.textContent = t.n ? t.n + ' file' + (t.n === 1 ? '' : 's') + ' · ' + sizeText(t.size) + ' on this phone. Not included in Export backup.' : '';
+    }
+    async function load() { try { filesUi.all = await listAll(); } catch (e) { filesUi.all = []; } filesUi.loaded = true; draw(); }
+    search.addEventListener('input', () => { filesUi.q = search.value; draw(); });
+    load();
+    return screen(
+      hdr({ eyebrow: 'KEEP IT SAFE', title: 'Documents', subtitle: 'Warranty cards, invoices and paper bills' }),
+      h('div', { class: 'info-card' }, icon('paperclip', 18, 'primary'), h('div', null, 'Add documents from an asset, bill, reminder or repair. Everything is listed here too. Files stay on this phone only.')),
+      search,
+      Segmented([{ value: 'all', label: 'All' }, { value: 'pdf', label: 'PDFs & files' }, { value: 'img', label: 'Photos' }], filesUi.type, (v) => { filesUi.type = v; A.render(); }),
+      empty, list, count);
+  }
+  // Only clean up when there is data to compare against, so an empty or not-yet-loaded list never wipes documents.
+  async function sweepFiles() { const live = liveOwners(); if (live.size) await sweep(live); }
 
   // ================= seasonal checklists =================
   function seasonalSheet() {
@@ -376,5 +467,5 @@ export function createExtras(A, kit) {
     return out;
   }
 
-  return { supplies, readings, contacts, vault, lent, plants, api: { completeItem, documents, seasonalSheet, sundayCard, insightsExtra } };
+  return { supplies, readings, contacts, vault, lent, plants, files, api: { completeItem, documents, attachments, clip, discardNew, sweepFiles, seasonalSheet, sundayCard, insightsExtra } };
 }
