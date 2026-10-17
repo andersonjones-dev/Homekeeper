@@ -25,6 +25,31 @@ export const QUIPS = {
     'Sorted before it became a problem.',
     'Look at you, ahead of the day.',
   ],
+  shopping: [
+    'Got it. The fridge approves.',
+    'Another item off the list.',
+    'Shopping like a pro.',
+    'Bought. No second trip needed.',
+  ],
+  shoppingClear: [
+    'Every last item. The list is empty.',
+    'List done. Nothing forgotten, for once.',
+    'Whole list bought. Go put your feet up.',
+  ],
+  supplies: [
+    'Refill logged. I will keep count for you.',
+    'Stocked up. One less thing to remember.',
+    'Delivered and noted.',
+  ],
+  plants: [
+    'Your plants say thank you.',
+    'Fresh water, happy leaves.',
+    'Green thumb confirmed.',
+  ],
+  lent: [
+    'Back where it belongs.',
+    'Returned. Friendship intact.',
+  ],
   clear: [
     'Nothing is waiting for you. Enjoy it.',
     'Inbox zero, but for your house.',
@@ -44,10 +69,12 @@ export function pickQuip(kind, rng = Math.random) {
 // What to show when something is completed. title is always shown; sub is an occasional extra line.
 // ctx: { remaining, doneThisWeek, fun, rng, now, lastAt }
 export function celebration(coll, ctx) {
-  const title = coll === 'bills' ? 'Bill paid' : coll === 'chores' ? 'Chore done' : 'Done';
+  const titles = { bills: 'Bill paid', chores: 'Chore done', shopping: 'Bought', supplies: 'Refill logged', plants: 'Watered', lent: 'Got it back' };
+  const title = titles[coll] || 'Done';
   if (!ctx.fun) return { title, sub: '', fun: false };
   const rng = ctx.rng || Math.random;
-  if (ctx.remaining === 0) return { title, sub: pickQuip('clear', rng), fun: true, big: true };
+  if (coll === 'shopping' && ctx.remaining === 0) return { title, sub: pickQuip('shoppingClear', rng), fun: true, big: true };
+  if (coll !== 'shopping' && ctx.remaining === 0) return { title, sub: pickQuip('clear', rng), fun: true, big: true };
   if (coll === 'chores' && [3, 5, 10, 15, 20, 30].includes(ctx.doneThisWeek)) return { title, sub: ctx.doneThisWeek + ' chores done this week. Nicely done.', fun: true };
   if ((ctx.now - (ctx.lastAt || 0)) > 20000 && rng() < 0.3) return { title, sub: pickQuip(coll, rng), fun: true };
   return { title, sub: '', fun: true };
