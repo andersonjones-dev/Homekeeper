@@ -2,6 +2,7 @@
 // phone gets the push even when the app is closed. Limitation: ntfy only accepts delays up to ~3 days, so
 // messages are scheduled inside a rolling window each time the app is opened.
 import { parseDate, daysBetween, todayStr } from './util.js';
+import { nextSundayAt, digestMessage } from './extras.js';
 
 export const WINDOW_HOURS = 48;
 
@@ -41,6 +42,14 @@ export function wantedMessages(when, opts) {
         message: w.title + (w.notes ? ' — ' + w.notes : ''),
         sig: w.title + '|' + w.date + '|' + Math.floor(t / 1000),
       });
+    }
+  }
+  // Sunday reset digest: one message at 6pm on the coming Sunday, if it falls inside the window.
+  if (o.digest && o.sunday !== false) {
+    const at = nextSundayAt(o.now, o.windowHours, 18);
+    if (at) {
+      const m = digestMessage(o.digest), ds = at.getFullYear() + '-' + (at.getMonth() + 1) + '-' + at.getDate();
+      out.push({ key: 'digest:' + ds, seq: 'hkdigest' + ds.replace(/-/g, ''), at: Math.floor(at.getTime() / 1000), title: asciiOnly(m.title), message: m.message, sig: m.message + '|' + Math.floor(at.getTime() / 1000) });
     }
   }
   return out;
