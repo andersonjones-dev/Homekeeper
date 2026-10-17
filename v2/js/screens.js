@@ -1,6 +1,6 @@
 // All screens. Each returns a DOM node placed inside the scrolling .screen container.
 import {
-  h, todayStr, daysFromToday, formatDate, formatShort, dueLabel, REPEATS, REPEAT_LABEL, isValidDate, parseAmount, formatMoney,
+  h, uid, todayStr, daysFromToday, formatDate, formatShort, dueLabel, REPEATS, REPEAT_LABEL, isValidDate, parseAmount, formatMoney,
   compareWindows, windowRange, sumInRange, monthlyTotals, groupTotals, monthLabel, percentChange, addDays,
 } from './util.js';
 import { ASSET_CATEGORIES, SHOP_CATEGORIES, BILL_TYPES, allWhen } from './store.js';
@@ -76,9 +76,11 @@ export function createScreens(A) {
       if (bad) return;
       cfg.onSave(out);
     }
+    if (cfg.attach) root.appendChild(A.api.attachments(cfg.attach.owner, { heading: cfg.attach.heading, title: cfg.attach.title, hint: cfg.attach.hint, onChange: () => { if (A.refreshClips) A.refreshClips(); } }));
+    const cancel = () => { if (cfg.attach && cfg.attach.isNew) A.api.discardNew(cfg.attach.owner); cfg.onCancel(); };
     root.appendChild(h('div', { class: 'form-actions' },
       cfg.onDelete && h('button', { class: 'danger-btn', type: 'button', onclick: cfg.onDelete, 'aria-label': 'Delete' }, icon('trash-2', 17)),
-      h('button', { class: 'keep-btn', type: 'button', onclick: cfg.onCancel }, 'Cancel'),
+      h('button', { class: 'keep-btn', type: 'button', onclick: cancel }, 'Cancel'),
       h('button', { class: 'primary-btn', type: 'button', onclick: save, 'data-testid': 'form-save' }, cfg.saveLabel || 'Save')));
     return root;
   }
@@ -283,7 +285,7 @@ export function createScreens(A) {
       forms[skey] || null,
       services.length
         ? h('div', { class: 'details-card' }, services.map((s, i) => h('button', { class: 'service-row' + (i < services.length - 1 ? ' bb' : ''), onclick: () => openForm(skey, () => serviceForm(id, s)) },
-          h('div', { class: 'upcoming-info' }, h('div', { class: 'upcoming-name' }, s.desc || 'Service'), h('div', { class: 'upcoming-date' }, formatDate(s.date))),
+          h('div', { class: 'upcoming-info' }, h('div', { class: 'upcoming-name' }, s.desc || 'Service'), h('div', { class: 'upcoming-date' }, formatDate(s.date), ' ', A.api.clip('services:' + s.id))),
           h('div', { class: 'service-cost' }, s.cost ? money(s.cost) : '—'))))
         : h('div', { class: 'quiet-card' }, h('div', { class: 'quiet-icon' }, icon('tool', 18)), h('div', { class: 'quiet-copy' }, h('div', { class: 'quiet-title' }, 'No repairs logged'), h('div', { class: 'quiet-text' }, 'Log a service or repair to track what this costs you over time.'))),
       services.length ? h('div', { class: 'total-line' }, 'Total spent: ', h('b', null, money(total))) : null,
@@ -300,7 +302,9 @@ export function createScreens(A) {
   }
 
   function serviceForm(assetId, s) {
+    const nid = s ? s.id : uid();
     return ItemForm({
+      attach: { owner: 'services:' + nid, isNew: !s, heading: 'Receipt or photo', title: 'Repair receipt', hint: 'Receipts stay on this phone only.' },
       title: s ? 'Edit service record' : 'Log a service or repair',
       initial: s ? { date: s.date, desc: s.desc, cost: s.cost } : { date: today(), desc: '', cost: 0 },
       fields: [
@@ -309,7 +313,7 @@ export function createScreens(A) {
         { key: 'cost', kind: 'amount', label: 'Cost', placeholder: '0' },
       ],
       onSave: (o) => {
-        store.mutate(s ? 'Record updated' : 'Service logged', (tx) => { if (s) tx.patch('services', s.id, o); else tx.add('services', Object.assign({ assetId }, o)); });
+        store.mutate(s ? 'Record updated' : 'Service logged', (tx) => { if (s) tx.patch('services', s.id, o); else tx.add('services', Object.assign({ id: nid, assetId }, o)); });
         delete forms['service-' + assetId]; A.render(); withToast(s ? 'Record updated' : 'Service logged');
       },
       onCancel: () => closeForm('service-' + assetId),
@@ -371,13 +375,15 @@ export function createScreens(A) {
         ? h('div', { class: 'list' }, list.map((r) => forms['rem-' + r.id] || Row({
           left: CheckCircle(r.done, () => { const was = r.done; store.setDone('reminders', r.id, !was); if (was) withToast('Marked not done'); else cheer('reminders'); }, 'Mark done'),
           title: r.title, done: r.done, onClick: () => openForm('rem-' + r.id, () => reminderForm(r)),
-          sub: h('span', null, [r.due ? h('span', { class: !r.done && daysFromToday(r.due, today()) < 0 ? 'overdue' : '' }, dueLabel(r.due, today())) : 'No date', r.repeat !== 'none' ? REPEAT_LABEL[r.repeat] : null].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
+          sub: h('span', null, [r.due ? h('span', { class: !r.done && daysFromToday(r.due, today()) < 0 ? 'overdue' : '' }, dueLabel(r.due, today())) : 'No date', r.repeat !== 'none' ? REPEAT_LABEL[r.repeat] : null, A.api.clip('reminders:' + r.id)].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
         })))
         : EmptyCard({ icon: 'bell', title: ui.remTab === 'todo' ? 'Nothing to remember' : 'No finished reminders', text: ui.remTab === 'todo' ? 'Add things a parent shouldn’t forget: insurance renewals, school forms, servicing dates.' : 'Done reminders will show up here.', button: ui.remTab === 'todo' ? 'Add a reminder' : null, onButton: () => openForm('rem-new', () => reminderForm(null)) }));
   }
   function reminderForm(r) {
     const k = r ? 'rem-' + r.id : 'rem-new';
+    const nid = r ? r.id : uid();
     return ItemForm({
+      attach: { owner: 'reminders:' + nid, isNew: !r, heading: 'Documents', title: 'Reminder document', hint: 'E.g. an insurance policy or a school form. Stays on this phone only.' },
       title: r ? 'Edit reminder' : 'New reminder',
       initial: r ? { title: r.title, due: r.due, repeat: r.repeat || 'none', notes: r.notes, cal: r.cal, ntf: r.ntf } : { title: '', due: '', repeat: 'none', notes: '' },
       fields: [
@@ -385,7 +391,7 @@ export function createScreens(A) {
         { key: 'due', kind: 'date', label: 'Date' }, repeatField,
         { key: 'notes', kind: 'notes', label: 'Notes', placeholder: 'Anything helpful…' }, calTri('reminders'), ntfTri('reminders'),
       ],
-      onSave: (o) => { store.mutate(r ? 'Reminder updated' : 'Reminder added', (tx) => { if (r) tx.patch('reminders', r.id, o); else tx.add('reminders', Object.assign({ done: false, doneAt: '' }, o)); }); delete forms[k]; A.render(); withToast(r ? 'Reminder updated' : 'Reminder added'); },
+      onSave: (o) => { store.mutate(r ? 'Reminder updated' : 'Reminder added', (tx) => { if (r) tx.patch('reminders', r.id, o); else tx.add('reminders', Object.assign({ id: nid, done: false, doneAt: '' }, o)); }); delete forms[k]; A.render(); withToast(r ? 'Reminder updated' : 'Reminder added'); },
       onCancel: () => closeForm(k),
       onDelete: r ? () => { store.mutate('Reminder removed', (tx) => tx.remove('reminders', r.id)); delete forms[k]; A.render(); withToast('Reminder removed'); } : null,
     });
@@ -415,15 +421,17 @@ export function createScreens(A) {
         ? h('div', { class: 'list' }, list.map((b) => forms['bill-' + b.id] || Row({
           left: CheckCircle(b.paid, () => { const was = b.paid; store.setDone('bills', b.id, !was); if (was) withToast('Marked not paid'); else cheer('bills'); }, 'Mark paid'),
           tile: BILL_ICON[b.type] || 'credit-card', title: b.name, done: b.paid, onClick: () => openForm('bill-' + b.id, () => billForm(b)),
-          sub: h('span', null, [b.type, b.due ? h('span', { class: !b.paid && daysFromToday(b.due, t) < 0 ? 'overdue' : '' }, (b.paid ? 'Due ' + formatShort(b.due) : dueLabel(b.due, t))) : null, b.repeat !== 'none' ? REPEAT_LABEL[b.repeat] : null].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
+          sub: h('span', null, [b.type, b.due ? h('span', { class: !b.paid && daysFromToday(b.due, t) < 0 ? 'overdue' : '' }, (b.paid ? 'Due ' + formatShort(b.due) : dueLabel(b.due, t))) : null, b.repeat !== 'none' ? REPEAT_LABEL[b.repeat] : null, A.api.clip('bills:' + b.id)].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
           right: h('div', { class: 'amount' }, b.amount ? money(b.amount) : '—'),
         })))
         : EmptyCard({ icon: 'credit-card', title: ui.billTab === 'upcoming' ? 'No bills to pay' : 'No paid bills yet', text: ui.billTab === 'upcoming' ? 'Add electricity, gas cylinder, broadband and other regular bills so none are missed.' : 'Bills you mark as paid show up here and feed your spending trends.', button: ui.billTab === 'upcoming' ? 'Add a bill' : null, onButton: () => openForm('bill-new', () => billForm(null)) }));
   }
   function billForm(b) {
     const k = b ? 'bill-' + b.id : 'bill-new';
+    const nid = b ? b.id : uid();
     const auto = (type) => (type === 'Gas cylinder' ? 'Gas cylinder' : type === 'Other' ? '' : type + ' bill');
     return ItemForm({
+      attach: { owner: 'bills:' + nid, isNew: !b, heading: 'Paper bill or receipt', title: 'Bill', hint: 'Add a photo or PDF of the bill. It stays on this phone only.' },
       title: b ? 'Edit bill' : 'New bill',
       initial: b ? { name: b.name, type: b.type, amount: b.amount, due: b.due, repeat: b.repeat || 'none', notes: b.notes, cal: b.cal, ntf: b.ntf } : { name: 'Electricity bill', type: 'Electricity', amount: 0, due: '', repeat: 'monthly', notes: '' },
       fields: [
@@ -433,7 +441,7 @@ export function createScreens(A) {
         { key: 'due', kind: 'date', label: 'Due date' }, repeatField,
         { key: 'notes', kind: 'notes', label: 'Notes', placeholder: 'Account number, provider…' }, calTri('bills'), ntfTri('bills'),
       ],
-      onSave: (o) => { store.mutate(b ? 'Bill updated' : 'Bill added', (tx) => { if (b) tx.patch('bills', b.id, o); else tx.add('bills', Object.assign({ paid: false, paidAt: '' }, o)); }); delete forms[k]; A.render(); withToast(b ? 'Bill updated' : 'Bill added'); },
+      onSave: (o) => { store.mutate(b ? 'Bill updated' : 'Bill added', (tx) => { if (b) tx.patch('bills', b.id, o); else tx.add('bills', Object.assign({ id: nid, paid: false, paidAt: '' }, o)); }); delete forms[k]; A.render(); withToast(b ? 'Bill updated' : 'Bill added'); },
       onCancel: () => closeForm(k),
       onDelete: b ? () => { store.mutate('Bill removed', (tx) => tx.remove('bills', b.id)); delete forms[k]; A.render(); withToast('Bill removed'); } : null,
     });
