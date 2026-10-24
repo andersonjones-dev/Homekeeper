@@ -316,6 +316,7 @@ export function createExtras(A, kit) {
       h('div', { class: 'btn-row' },
         !img ? h('a', { class: 'keep-btn wide', href: u, target: '_blank', rel: 'noopener', 'data-testid': 'file-open' }, icon('file-text', 16), h('span', null, 'Open')) : null,
         h('button', { class: 'keep-btn wide', onclick: () => shareOrSave(rec, title), 'data-testid': 'file-share' }, icon('send', 16), h('span', null, 'Share or save'))),
+      h('div', { class: 'hint left' }, 'This file exists only on this phone. Use “Share or save” first if you want a copy elsewhere. Deleting cannot be undone.'),
       h('button', { class: 'delete-btn', 'data-testid': 'file-delete', onclick: async () => { try { await deleteFile(rec); } catch (e) { /* ignore */ } sheet.close(); toast('Removed'); if (onChange) onChange(); } }, icon('trash-2', 17), h('span', null, 'Delete'))));
   }
   // Add / view documents for one item. owner is like "bills:abc". Files stay on this phone.
@@ -323,7 +324,7 @@ export function createExtras(A, kit) {
     o = o || {};
     const strip = h('div', { class: 'thumbs', 'data-testid': 'thumbs' });
     const input = h('input', { type: 'file', accept: 'image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.txt', multiple: true, hidden: true, 'data-testid': 'photo-input' });
-    const note = o.hint || 'Photos and PDFs stay on this phone only. They are not sent through Family sync.';
+    const note = o.hint || 'Saved only on this phone. Not synced to your family, not in Export backup, and lost if the app or its data is deleted.';
     const status = h('div', { class: 'hint left' }, note);
     let files = [];
     async function refresh(notify) {
@@ -410,14 +411,14 @@ export function createExtras(A, kit) {
         right: h('button', { class: 'view-all', type: 'button', onclick: () => A.nav(info.path) }, 'Go to'),
       })));
       empty.hidden = filesUi.all.length > 0; list.hidden = rows.length === 0; const t = totals();
-      count.textContent = t.n ? t.n + ' file' + (t.n === 1 ? '' : 's') + ' · ' + sizeText(t.size) + ' on this phone. Not included in Export backup.' : '';
+      count.textContent = t.n ? t.n + ' file' + (t.n === 1 ? '' : 's') + ' · ' + sizeText(t.size) + ' on this phone only. Not synced, not in Export backup.' : '';
     }
     async function load() { try { filesUi.all = await listAll(); } catch (e) { filesUi.all = []; } filesUi.loaded = true; draw(); }
     search.addEventListener('input', () => { filesUi.q = search.value; draw(); });
     load();
     return screen(
       hdr({ eyebrow: 'KEEP IT SAFE', title: 'Documents', subtitle: 'Warranty cards, invoices and paper bills' }),
-      h('div', { class: 'info-card' }, icon('paperclip', 18, 'primary'), h('div', null, 'Add documents from an asset, bill, reminder or repair. Everything is listed here too. Files stay on this phone only.')),
+      h('div', { class: 'info-card' }, icon('paperclip', 18, 'primary'), h('div', null, h('b', null, 'Saved only on this phone. '), 'Add documents from an asset, bill, reminder or repair and they are listed here too. They are not synced to your family, not in Export backup, and gone if you delete the app or clear Safari’s website data. Open a file and tap “Share or save” to keep a copy elsewhere.')),
       search,
       Segmented([{ value: 'all', label: 'All' }, { value: 'pdf', label: 'PDFs & files' }, { value: 'img', label: 'Photos' }], filesUi.type, (v) => { filesUi.type = v; A.render(); }),
       empty, list, count);
