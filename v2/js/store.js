@@ -10,12 +10,15 @@ const TOMBSTONE_DAYS = 60;
 
 export const DEFAULT_SHARED = () => ({
   currency: '₹',
+  budgets: {},
+  homeAddress: '',
   calDefaults: { chores: false, bills: true, reminders: true, warranties: true, supplies: false },
   ntfDefaults: { chores: true, bills: true, reminders: true, warranties: false, supplies: true },
   updatedAt: 0,
 });
 export const DEFAULT_PREFS = () => ({
   theme: 'auto',
+  look: 'classic',
   fun: true,
   darkStyle: 'midnight',
   name: '',
