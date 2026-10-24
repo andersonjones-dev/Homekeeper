@@ -8,3 +8,28 @@ export const DARK_STYLES = {
 export const DEFAULT_DARK = 'midnight';
 export const LIGHT_BG = '#F7F6F0';
 export function darkBg(style) { return (DARK_STYLES[style] || DARK_STYLES[DEFAULT_DARK]).bg; }
+
+// Looks: Classic is the original. The others restyle colours, headings and a little decoration; layout and features are identical.
+// bg = [light, dark] status bar colours. Onyx is always dark. fonts = Google Fonts loaded only when the look is chosen.
+export const LOOKS = {
+  classic: { label: 'Classic', dot: '#607C69', dotBg: '#E9EEE7', bg: null },
+  linen: { label: 'Linen', dot: '#A8553B', dotBg: '#F0E1D2', bg: ['#F7F1E8', '#1A1512'], fonts: 'family=Fraunces:opsz,wght@9..144,500;9..144,600' },
+  fern: { label: 'Fern', dot: '#2F7A4B', dotBg: '#DDEDD7', bg: ['#EEF5EA', '#0E1A12'], fonts: 'family=Bricolage+Grotesque:opsz,wght@12..96,700' },
+  onyx: { label: 'Onyx', dot: '#E8C98A', dotBg: '#000000', bg: ['#000000', '#000000'], fonts: 'family=Sora:wght@600', alwaysDark: true },
+};
+export const DEFAULT_LOOK = 'classic';
+export function lookKey(l) { return LOOKS[l] ? l : DEFAULT_LOOK; }
+export function barColour(look, dark, style) {
+  const L = LOOKS[lookKey(look)];
+  if (L.bg) return L.bg[dark ? 1 : 0];
+  return dark ? darkBg(style) : LIGHT_BG;
+}
+export function loadLookFonts(look) {
+  const L = LOOKS[lookKey(look)];
+  if (!L.fonts || typeof document === 'undefined') return;
+  const id = 'look-fonts-' + lookKey(look);
+  if (document.getElementById(id)) return;
+  const link = document.createElement('link'); link.id = id; link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?' + L.fonts + '&display=swap';
+  document.head.appendChild(link);
+}
