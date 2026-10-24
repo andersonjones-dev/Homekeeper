@@ -11,7 +11,7 @@ import {
 import { buildICS } from './calendar.js';
 import { celebration, ownership } from './delight.js';
 import { extraAttention } from './extras.js';
-import { DARK_STYLES } from './themes.js';
+import { DARK_STYLES, LOOKS } from './themes.js';
 import { topicFromCode } from './notify.js';
 
 export function createScreens(A) {
@@ -128,6 +128,7 @@ export function createScreens(A) {
           metric(weekCount, 'due this week'), h('div', { class: 'metric-divider' }),
           metric(upcoming.length, 'warranty watch'))),
       A.api.sundayCard(dueItems),
+      A.api.budgetWatch(),
       dueItems.length ? attentionCard(dueItems) : null,
       SectionHeader('Upcoming maintenance', 'Warranty milestones in the next 90 days', upcoming.length ? h('div', { class: 'count-badge' }, upcoming.length) : null),
       upcoming.length
@@ -304,7 +305,7 @@ export function createScreens(A) {
   function serviceForm(assetId, s) {
     const nid = s ? s.id : uid();
     return ItemForm({
-      attach: { owner: 'services:' + nid, isNew: !s, heading: 'Receipt or photo', title: 'Repair receipt', hint: 'Receipts stay on this phone only.' },
+      attach: { owner: 'services:' + nid, isNew: !s, heading: 'Receipt or photo', title: 'Repair receipt', hint: 'Saved only on this phone. Not synced, not in Export backup.' },
       title: s ? 'Edit service record' : 'Log a service or repair',
       initial: s ? { date: s.date, desc: s.desc, cost: s.cost } : { date: today(), desc: '', cost: 0 },
       fields: [
@@ -383,7 +384,7 @@ export function createScreens(A) {
     const k = r ? 'rem-' + r.id : 'rem-new';
     const nid = r ? r.id : uid();
     return ItemForm({
-      attach: { owner: 'reminders:' + nid, isNew: !r, heading: 'Documents', title: 'Reminder document', hint: 'E.g. an insurance policy or a school form. Stays on this phone only.' },
+      attach: { owner: 'reminders:' + nid, isNew: !r, heading: 'Documents', title: 'Reminder document', hint: 'E.g. an insurance policy or a school form. Saved only on this phone. Not synced, not in Export backup.' },
       title: r ? 'Edit reminder' : 'New reminder',
       initial: r ? { title: r.title, due: r.due, repeat: r.repeat || 'none', notes: r.notes, cal: r.cal, ntf: r.ntf } : { title: '', due: '', repeat: 'none', notes: '' },
       fields: [
@@ -431,7 +432,7 @@ export function createScreens(A) {
     const nid = b ? b.id : uid();
     const auto = (type) => (type === 'Gas cylinder' ? 'Gas cylinder' : type === 'Other' ? '' : type + ' bill');
     return ItemForm({
-      attach: { owner: 'bills:' + nid, isNew: !b, heading: 'Paper bill or receipt', title: 'Bill', hint: 'Add a photo or PDF of the bill. It stays on this phone only.' },
+      attach: { owner: 'bills:' + nid, isNew: !b, heading: 'Paper bill or receipt', title: 'Bill', hint: 'Add a photo or PDF of the bill. Saved only on this phone. Not synced, not in Export backup.' },
       title: b ? 'Edit bill' : 'New bill',
       initial: b ? { name: b.name, type: b.type, amount: b.amount, due: b.due, repeat: b.repeat || 'none', notes: b.notes, cal: b.cal, ntf: b.ntf } : { name: 'Electricity bill', type: 'Electricity', amount: 0, due: '', repeat: 'monthly', notes: '' },
       fields: [
@@ -551,7 +552,7 @@ export function createScreens(A) {
       sel.length ? h('div', { class: 'cal-actions' },
         h('button', { class: 'save-btn sticky', onclick: () => A.openInCalendar(sel, alarm), 'data-testid': 'open-calendar' }, icon('calendar', 18), h('span', null, 'Add ' + sel.length + (sel.length === 1 ? ' item' : ' items') + ' to Calendar')),
         h('button', { class: 'keep-btn wide', onclick: () => A.exportCalendar(sel, alarm), 'data-testid': 'export-calendar' }, icon('download', 16), h('span', null, 'Share or save as a file instead'))) : null,
-      sel.length ? h('div', { class: 'hint' }, 'Tap the green button and choose “Add All” when the Calendar sheet appears. If nothing opens, use “Share or save as a file”, pick Save to Files, open the file in the Files app and tap Add All. Doing it again later updates the same events.') : null);
+      sel.length ? h('div', { class: 'hint' }, 'Tap the green button. Your iPhone should show the events with an “Add All” button. If it doesn’t, use “Share or save as a file”: save it to Files, or send it to yourself in Messages or Mail and tap the attachment. Doing it again later updates the same events.') : null);
   }
 
   // ---------- INSIGHTS ----------
@@ -576,7 +577,8 @@ export function createScreens(A) {
     const cls = (c, p) => (c > p ? 'up' : c < p ? 'down' : '');
     if (!rows.length && !wkNow.length && !wkPrev.length) {
       return screen(hdr({ eyebrow: 'TRENDS', title: 'Insights', subtitle: 'Spending and household activity' }),
-        EmptyCard({ icon: 'bar-chart-2', title: 'Not enough data yet', text: 'Mark bills as paid and log repairs on your assets. Trends and comparisons appear here as you go.' }));
+        EmptyCard({ icon: 'bar-chart-2', title: 'Not enough data yet', text: 'Mark bills as paid and log repairs on your assets. Trends and comparisons appear here as you go.' }),
+        A.api.budgetCard());
     }
     return screen(
       hdr({ eyebrow: 'TRENDS', title: 'Insights', subtitle: 'Last 3 months vs the 3 months before' }),
@@ -586,6 +588,7 @@ export function createScreens(A) {
           h('div', { class: 'summary-metric' }, h('div', { class: 'summary-number' }, money(q.cur)), h('div', { class: 'metric-label' }, 'this quarter')),
           h('div', { class: 'metric-divider' }),
           h('div', { class: 'summary-metric' }, h('div', { class: 'summary-number sm' }, money(q.prev)), h('div', { class: 'metric-label' }, q.prev || q.cur ? 'before that (' + chg(q.cur, q.prev) + ')' : 'before that')))),
+      A.api.budgetCard(),
       A.api.insightsExtra(),
       replaceList.length ? h('div', { class: 'info-card warn', 'data-testid': 'replace-list' }, icon('alert-circle', 18, 'destructive'), h('div', null, replaceList.map((r) => h('div', null, r.name + ': repairs are ' + Math.round(r.share * 100) + '% of the purchase price. Maybe time to replace.')))) : null,
       rising.length ? h('div', { class: 'info-card warn', 'data-testid': 'rising' }, icon('trending-up', 18, 'destructive'), h('div', null, rising.slice(0, 3).map((r) => h('div', null, h('b', null, r.key), ' cost ' + money(r.cur) + ' this quarter, up ' + Math.round(((r.cur - r.prev) / r.prev) * 100) + '% from ' + money(r.prev) + ' last quarter.')))) : null,
@@ -632,8 +635,11 @@ export function createScreens(A) {
       hdr({ eyebrow: 'PREFERENCES', title: 'Settings', subtitle: 'Make HomeKeeper yours' }),
       Card('Appearance', 'Light, dark, or match your phone',
         Segmented([{ value: 'auto', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }], p.theme, (v) => { store.setPrefs({ theme: v }); A.applyTheme(); A.render(); A.reloadIfBarStale(); }),
-          h('div', { class: 'label inline' }, 'Dark style'),
-          h('div', { class: 'dark-styles', 'data-testid': 'dark-styles' }, Object.entries(DARK_STYLES).map(([k, d]) => h('button', { class: 'dark-style' + ((p.darkStyle || 'midnight') === k ? ' on' : ''), 'aria-pressed': (p.darkStyle || 'midnight') === k, 'data-testid': 'dark-' + k, onclick: () => { store.setPrefs({ darkStyle: k }); A.applyTheme(); A.render(); A.reloadIfBarStale(true); } }, h('span', { class: 'dark-dot', style: 'background:' + d.dot + ';box-shadow:inset 0 0 0 6px ' + d.bg }), h('span', null, d.label)))),
+          h('div', { class: 'label inline' }, 'Look'),
+          h('div', { class: 'look-opts', 'data-testid': 'look-opts' }, Object.entries(LOOKS).map(([k, l]) => h('button', { class: 'look-opt' + ((p.look || 'classic') === k ? ' on' : ''), 'aria-pressed': (p.look || 'classic') === k, 'data-testid': 'look-' + k, onclick: () => { store.setPrefs({ look: k }); A.applyTheme(); A.render(); A.reloadIfBarStale(); } }, h('span', { class: 'look-dot', style: 'background:' + l.dot + ';box-shadow:inset 0 0 0 6px ' + l.dotBg }), h('span', null, l.label)))),
+          (p.look || 'classic') === 'onyx' ? h('div', { class: 'hint left', 'data-testid': 'onyx-note' }, 'Onyx is always dark, so Light and the dark styles are paused while it is on.') : null,
+          (p.look || 'classic') === 'classic' ? h('div', { class: 'label inline' }, 'Dark style') : null,
+          (p.look || 'classic') !== 'classic' ? null : h('div', { class: 'dark-styles', 'data-testid': 'dark-styles' }, Object.entries(DARK_STYLES).map(([k, d]) => h('button', { class: 'dark-style' + ((p.darkStyle || 'midnight') === k ? ' on' : ''), 'aria-pressed': (p.darkStyle || 'midnight') === k, 'data-testid': 'dark-' + k, onclick: () => { store.setPrefs({ darkStyle: k }); A.applyTheme(); A.render(); A.reloadIfBarStale(true); } }, h('span', { class: 'dark-dot', style: 'background:' + d.dot + ';box-shadow:inset 0 0 0 6px ' + d.bg }), h('span', null, d.label)))),
           h('div', { class: 'hint left' }, 'The app reloads once when the theme changes, so the phone’s status bar colour can follow it.')),
       Card('Fun messages', 'A little cheer when you finish something',
         h('div', { class: 'details-card' }, SetRow('Show pop-up cheers and the odd joke', null, Switch(p.fun !== false, (v) => store.setPrefs({ fun: v }), 'Fun messages'), true))),
@@ -663,8 +669,9 @@ export function createScreens(A) {
             ? [h('div', { class: 'label inline' }, 'Your family code'), h('div', { class: 'mono', 'data-testid': 'family-code' }, p.familyCode),
               h('div', { class: 'btn-row' }, h('button', { class: 'keep-btn wide', onclick: () => A.shareText('Join my HomeKeeper family: ' + p.familyCode) }, icon('send', 16), h('span', null, 'Share code')), syncBtn),
               status,
+              h('div', { class: 'hint left' }, 'Documents and photos are never synced. They stay only on the phone where you added them.'),
               h('button', { class: 'delete-btn', onclick: () => { A.sync.leave(); A.render(); toast('Left the family. Data on this phone is kept.'); } }, h('span', null, 'Leave family'))]
-            : [h('div', { class: 'set-sub pad-b' }, 'Safari and the Home Screen app keep separate data on the same phone, so use a code to share between them too. Create a code on one, then enter it on the other. Everything is encrypted on your phone before it is sent, so the sync server cannot read it.'),
+            : [h('div', { class: 'set-sub pad-b' }, 'Safari and the Home Screen app keep separate data on the same phone, so use a code to share between them too. Create a code on one, then enter it on the other. Everything is encrypted on your phone before it is sent, so the sync server cannot read it. Documents and photos are not synced; they stay only on the phone where you added them.'),
               createBtn, h('div', { class: 'label inline' }, 'Or join with a code'), joinInput, joinBtn],
           h('details', { class: 'adv' }, h('summary', null, 'Advanced'),
             h('div', { class: 'set-sub' }, 'Use your own sync endpoint (any URL that accepts GET and PUT of JSON). Leave empty for the default.'),
@@ -672,7 +679,8 @@ export function createScreens(A) {
       Card('Your data', 'Stored on this phone' + (syncOn ? ' and synced to your family' : ''),
         h('div', { class: 'details-card pad' },
           h('div', { class: 'btn-row' }, h('button', { class: 'keep-btn wide', onclick: () => A.exportBackup(), 'data-testid': 'export-backup' }, icon('download', 16), h('span', null, 'Export backup')), h('button', { class: 'keep-btn wide', onclick: () => file.click() }, icon('upload', 16), h('span', null, 'Import backup')), file),
-          h('button', { class: 'keep-btn wide mt', disabled: !store.canUndo(), onclick: () => { toast(store.undo() ? 'Undone' : 'Nothing to undo'); }, 'data-testid': 'undo-last' }, icon('rotate-ccw', 16), h('span', null, 'Undo last change')))),
+          h('button', { class: 'keep-btn wide mt', disabled: !store.canUndo(), onclick: () => { toast(store.undo() ? 'Undone' : 'Nothing to undo'); }, 'data-testid': 'undo-last' }, icon('rotate-ccw', 16), h('span', null, 'Undo last change'))),
+        h('div', { class: 'info-card warn', 'data-testid': 'files-local-note' }, icon('paperclip', 18, 'primary'), h('div', null, h('b', null, 'Your files stay on this phone. '), 'They are not sent through Family sync and are not in Export backup, so nobody else sees them and they cannot be restored on a new phone. If you delete the app or clear Safari’s website data, they are gone. Use “Share or save” on a file to keep a copy elsewhere.'))),
       h('div', { class: 'footer-note' }, 'HomeKeeper · all data lives on your phone unless you turn on family sync.'));
   }
 
