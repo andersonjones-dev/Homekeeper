@@ -7,9 +7,10 @@ import { topicFromCode, reconcile, sendNow, WINDOW_HOURS } from './notify.js';
 import { icon, setUndoHandler, toast } from './ui.js';
 import { createScreens } from './screens.js';
 import { createExtras } from './extras-screens.js';
+import { createPlanner } from './planner-screens.js';
 import { loadIndex } from './photos.js';
 import { digestCounts } from './extras.js';
-import { darkBg, LIGHT_BG, DEFAULT_DARK } from './themes.js';
+import { darkBg, LIGHT_BG, DEFAULT_DARK, LOOKS, lookKey, barColour, loadLookFonts } from './themes.js';
 import { openVoice } from './voice.js';
 
 let storage;
@@ -31,7 +32,7 @@ const MENU = [
   { path: '/calendar', label: 'Calendar', icon: 'calendar' }, { path: '/insights', label: 'Insights', icon: 'bar-chart-2' },
   { section: 'MORE FOR YOUR HOME' },
   { path: '/supplies', label: 'Supplies', icon: 'package' }, { path: '/readings', label: 'Meter readings', icon: 'activity' }, { path: '/contacts', label: 'Who to call', icon: 'phone' },
-  { path: '/files', label: 'Documents', icon: 'paperclip' }, { path: '/vault', label: 'Home vault', icon: 'lock' }, { path: '/plants', label: 'Plants', icon: 'feather' }, { path: '/lent', label: 'Lent items', icon: 'gift' },
+  { path: '/emergency', label: 'Emergency card', icon: 'alert-circle' }, { path: '/report', label: 'Monthly report', icon: 'file-text' }, { path: '/files', label: 'Documents', icon: 'paperclip' }, { path: '/vault', label: 'Home vault', icon: 'lock' }, { path: '/plants', label: 'Plants', icon: 'feather' }, { path: '/lent', label: 'Lent items', icon: 'gift' },
   { section: 'APP' },
   { path: '/settings', label: 'Settings', icon: 'settings' },
 ];
@@ -52,10 +53,21 @@ const A = {
     await deliverFile('homekeeper.ics', ics, 'text/calendar');
   },
   // One tap: hand the events straight to the phone's Calendar. iPhone opens a calendar file link with its own "Add All" sheet.
-  openInCalendar(items, alarm) {
+  // Best route: store the file where the app's own service worker can serve it at a real web address with the calendar
+  // content type, then go there. That is what a website's "Add to calendar" link does, and iPhone shows its Add All sheet.
+  async openInCalendar(items, alarm) {
     const ics = buildICS(items.map((w) => ({ id: w.id, title: w.title, date: w.date, notes: w.notes })), { alarm });
+    try {
+      if ('caches' in window && navigator.serviceWorker && navigator.serviceWorker.controller) {
+        const c = await caches.open('hk2-cal');
+        await c.put('cal/homekeeper.ics', new Response(ics, { headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': 'inline; filename="homekeeper.ics"' } }));
+        location.href = new URL('cal/homekeeper.ics?t=' + Date.now(), document.baseURI).href;
+        return;
+      }
+    } catch (e) { /* fall through to the older way */ }
     const a = h('a', { href: 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics), target: '_blank', rel: 'noopener' });
     document.body.appendChild(a); a.click(); a.remove();
+    toast('If nothing opened, close and reopen the app once, then try again');
   },
   async exportBackup() { await deliverFile('homekeeper-backup-' + todayStr() + '.json', JSON.stringify(store.exportData(), null, 2), 'application/json'); },
 };
@@ -70,9 +82,10 @@ async function deliverFile(name, text, type) {
 }
 const base = createScreens(A);
 const extra = createExtras(A, base.kit);
-A.api = extra.api;
+const planner = createPlanner(A, base.kit);
+A.api = Object.assign({}, extra.api, planner.api);
 A.refreshClips = () => { const ae = document.activeElement; if (!(ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName))) render(); };
-const screens = Object.assign({}, base, extra);
+const screens = Object.assign({}, base, extra, { report: planner.report, emergency: planner.emergency });
 setUndoHandler(() => { store.undo(); });
 
 // ---------- theme ----------
@@ -80,17 +93,20 @@ const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)')
 let shownKey = null;
 function themeState() {
   const pref = store.prefs.theme;
-  const dark = pref === 'dark' || (pref === 'auto' && mq && mq.matches);
+  const look = lookKey(store.prefs.look);
+  const dark = LOOKS[look].alwaysDark || pref === 'dark' || (pref === 'auto' && mq && mq.matches);
   const style = store.prefs.darkStyle || DEFAULT_DARK;
-  return { dark, style, key: dark ? 'dark-' + style : 'light' };
+  return { dark, style, look, key: look + '|' + (dark ? 'dark-' + style : 'light') };
 }
 function applyTheme() {
-  const { dark, style, key } = themeState();
+  const { dark, style, look, key } = themeState();
   const root = document.documentElement;
   root.setAttribute('data-theme', dark ? 'dark' : 'light');
   root.setAttribute('data-dark', style);
+  root.setAttribute('data-look', look);
+  loadLookFonts(look);
   // Tell the phone about the new colour: swap in a fresh theme-color tag (iOS notices a new tag, not just a changed value).
-  const colour = dark ? darkBg(style) : LIGHT_BG;
+  const colour = barColour(look, dark, style);
   document.querySelectorAll('meta[name=theme-color]').forEach((m) => m.remove());
   const meta = document.createElement('meta'); meta.name = 'theme-color'; meta.content = colour; document.head.appendChild(meta);
   root.style.backgroundColor = colour;
@@ -123,7 +139,7 @@ function render() {
     else if (a === 'assets' && b && c === 'edit') content = screens.assetForm(b);
     else if (a === 'assets' && b) content = screens.assetDetail(b);
     else if (a === 'assets') content = screens.assets();
-    else if (screens[a] && ['chores', 'reminders', 'bills', 'shopping', 'calendar', 'insights', 'settings', 'supplies', 'readings', 'contacts', 'vault', 'plants', 'lent', 'files'].includes(a)) content = screens[a]();
+    else if (screens[a] && ['chores', 'reminders', 'bills', 'shopping', 'calendar', 'insights', 'settings', 'supplies', 'readings', 'contacts', 'vault', 'plants', 'lent', 'files', 'report', 'emergency'].includes(a)) content = screens[a]();
     else content = h('div', { class: 'content' }, h('div', { class: 'not-found' }, h('div', { class: 'nf-title' }, 'This screen doesn’t exist.'), h('button', { class: 'link', onclick: () => A.nav('/') }, 'Go to home screen!')));
   } catch (e) {
     console.error(e);
