@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#F7F6F0">
 <script>
 /* Set the theme before anything is drawn, so the status bar area is the right colour from the very first paint. */
-(function(){try{var p=JSON.parse(localStorage.getItem('hk2.prefs.v1')||'{}');var t=p.theme||'auto';var d=t==='dark'||(t==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);var bgs={midnight:'#0D1220',aurora:'#0A1A1D',plum:'#16101F',forest:'#121815'};var st=bgs[p.darkStyle]?p.darkStyle:'midnight';var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-dark',st);var m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute('content',d?bgs[st]:'#F7F6F0');}catch(e){}})();
+(function(){try{var p=JSON.parse(localStorage.getItem('hk2.prefs.v1')||'{}');var t=p.theme||'auto';var d=t==='dark'||(t==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);var bgs={midnight:'#0D1220',aurora:'#0A1A1D',plum:'#16101F',forest:'#121815'};var st=bgs[p.darkStyle]?p.darkStyle:'midnight';var lk={linen:['#F7F1E8','#1A1512'],fern:['#EEF5EA','#0E1A12'],onyx:['#000000','#000000']};var look=lk[p.look]?p.look:'classic';if(look==='onyx')d=true;var r=document.documentElement;r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-dark',st);r.setAttribute('data-look',look);var col=lk[look]?lk[look][d?1:0]:(d?bgs[st]:'#F7F6F0');var m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute('content',col);r.style.backgroundColor=col;}catch(e){}})();
 </script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@
 <script>
 // Shows the real error on screen if the app cannot start.
 (function(){
-  var sizes={"js/util.js":0,"js/store.js":0,"js/parser.js":0,"js/calendar.js":0,"js/notify.js":0,"js/sync.js":0,"js/delight.js":0,"js/extras.js":0,"js/extras-screens.js":0,"js/themes.js":0,"js/photos.js":0,"js/qr.js":0,"js/ui.js":0,"js/screens.js":0,"js/voice.js":0,"js/app.js":0,"css/app.css":0};
+  var sizes={"js/util.js":0,"js/store.js":0,"js/parser.js":0,"js/calendar.js":0,"js/notify.js":0,"js/sync.js":0,"js/delight.js":0,"js/extras.js":0,"js/extras-screens.js":0,"js/themes.js":0,"js/photos.js":0,"js/planner.js":0,"js/planner-screens.js":0,"js/qr.js":0,"js/ui.js":0,"js/screens.js":0,"js/voice.js":0,"js/app.js":0,"css/app.css":0};
   function show(msg){var a=document.getElementById('app');if(!a)return;var d=document.createElement('div');d.style.cssText='padding:24px 20px;font:14px/1.5 -apple-system,system-ui,sans-serif;color:#24312C;word-break:break-word';d.setAttribute('data-boot-error','1');d.textContent=msg;a.appendChild(d);}
   window.__bootErr=[];
   window.addEventListener('error',function(e){window.__bootErr.push(e.message);});
