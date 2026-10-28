@@ -15,6 +15,8 @@ export const LOOKS = {
   classic: { label: 'Classic', dot: '#607C69', dotBg: '#E9EEE7', bg: null },
   linen: { label: 'Linen', dot: '#A8553B', dotBg: '#F0E1D2', bg: ['#F7F1E8', '#1A1512'], fonts: 'family=Fraunces:opsz,wght@9..144,500;9..144,600' },
   fern: { label: 'Fern', dot: '#2F7A4B', dotBg: '#DDEDD7', bg: ['#EEF5EA', '#0E1A12'], fonts: 'family=Bricolage+Grotesque:opsz,wght@12..96,700' },
+  neu: { label: 'Neumorphic', dot: '#B93A22', dotBg: '#E6E9EF', bg: ['#E6E9EF', '#23272F'], fonts: 'family=Mulish:wght@400;700' },
+  bento: { label: 'Bento Grid', dot: '#2D5BFF', dotBg: '#F4F4F2', bg: ['#F4F4F2', '#0B0B0C'], fonts: 'family=Outfit:wght@400;700' },
   onyx: { label: 'Onyx', dot: '#E8C98A', dotBg: '#000000', bg: ['#000000', '#000000'], fonts: 'family=Sora:wght@600', alwaysDark: true },
 };
 export const DEFAULT_LOOK = 'classic';

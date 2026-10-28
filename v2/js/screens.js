@@ -112,6 +112,11 @@ export function createScreens(A) {
     const upcoming = assets.filter((a) => { const d = daysFromToday(a.warrantyExpiry, t); return d !== null && d >= 0 && d <= 90; }).sort((a, b) => a.warrantyExpiry.localeCompare(b.warrantyExpiry));
     const dueItems = attention(t);
     const weekCount = dueItems.filter((x) => x.days <= 7).length;
+    // Progress dial (shown by the Neumorphic look only): chores finished this week out of those finished plus still due.
+    const wk0 = windowRange(t, 7, 0)[0];
+    const doneWk = store.live('chores').filter((x) => x.done && x.doneAt >= wk0).length;
+    const dialTotal = doneWk + dueItems.length;
+    const dial = dialTotal ? h('div', { class: 'look-dial', style: '--p:' + Math.round(doneWk / dialTotal * 100), role: 'img', 'aria-label': doneWk + ' of ' + dialTotal + ' tasks done this week', 'data-testid': 'look-dial' }, h('div', { class: 'dv' }, h('span', null, doneWk + '/' + dialTotal), h('small', null, 'done'))) : null;
     return screen(
       h('div', { class: 'topbar' },
         h('div', { class: 'brand' }, 'HOMEKEEPER'),
@@ -126,7 +131,8 @@ export function createScreens(A) {
         h('div', { class: 'summary-numbers' },
           metric(assets.length, assets.length === 1 ? 'saved asset' : 'saved assets'), h('div', { class: 'metric-divider' }),
           metric(weekCount, 'due this week'), h('div', { class: 'metric-divider' }),
-          metric(upcoming.length, 'warranty watch'))),
+          metric(upcoming.length, 'warranty watch')),
+        dial),
       A.api.sundayCard(dueItems),
       A.api.budgetWatch(),
       dueItems.length ? attentionCard(dueItems) : null,
