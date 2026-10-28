@@ -611,6 +611,70 @@ export function createScreens(A) {
   const SetRow = (label, sub, control, last) => h('div', { class: 'set-row' + (last ? '' : ' bb') }, h('div', { class: 'set-text' }, h('div', { class: 'set-label' }, label), sub && h('div', { class: 'set-sub' }, sub)), control);
   const Card = (title, caption, ...kids) => h('div', { class: 'set-section' }, SectionHeader(title, caption), kids);
 
+  // ---------- ACCOUNT & BACKUP ----------
+  function accountCard() {
+    const C = A.cloud, ui = A.cloudUI, p = store.prefs;
+    if (!C.configured()) return null;
+    const run = (btn, fn) => async () => { btn.disabled = true; try { await fn(); } catch (e) { toast(String(e.message || e)); } finally { btn.disabled = false; A.render(); } };
+    const ago = (t) => { if (!t) return 'not yet'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : new Date(t).toLocaleDateString(); };
+    const inviteNote = p.cloudInvite ? h('div', { class: 'info-card', 'data-testid': 'invite-pending' }, icon('gift', 18, 'primary'), h('div', null, h('b', null, 'You’ve been invited to a home. '), 'Sign in to join it. Anything already on this phone is added to the shared home.')) : null;
+
+    if (!C.signedIn()) {
+      const why = h('div', { class: 'set-sub pad-b' }, 'Sign in with your email and HomeKeeper backs up everything to your account: assets, warranties, chores, bills and settings. It stays saved even if you don’t open the app for years, and comes back when you sign in on a new phone. There’s no password: we email you a code each time.');
+      if (ui.step === 'code' && ui.email) {
+        const codeIn = TextInput({ label: 'Code from the email', placeholder: '123456', inputmode: 'numeric', autocapitalize: 'none', testid: 'cloud-code', enterkeyhint: 'go' });
+        codeIn.setAttribute('autocomplete', 'one-time-code');
+        const go = h('button', { class: 'primary-btn wide', 'data-testid': 'cloud-verify' }, 'Sign in');
+        go.onclick = run(go, async () => { await C.verify(ui.email, codeIn.value); ui.step = 'email'; toast('Signed in. Your home is backed up.'); });
+        codeIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go.click(); } });
+        const again = h('button', { class: 'keep-btn wide' }, icon('refresh', 16), h('span', null, 'Send a new code'));
+        again.onclick = run(again, async () => { await C.sendCode(ui.email); toast('New code sent'); });
+        const other = h('button', { class: 'keep-btn wide', onclick: () => { ui.step = 'email'; A.render(); } }, h('span', null, 'Use a different email'));
+        return Card('Account & backup', 'Keep your home safe, even on a new phone',
+          h('div', { class: 'details-card pad', 'data-testid': 'account-card' }, inviteNote,
+            h('div', { class: 'set-sub pad-b' }, 'We sent a code to ', h('b', null, ui.email), '. Enter it below. It can take a minute to arrive; check spam too.'),
+            codeIn, go, h('div', { class: 'btn-row mt' }, again, other)));
+      }
+      const emailIn = TextInput({ label: 'Your email', placeholder: 'you@example.com', type: 'email', inputmode: 'email', autocapitalize: 'none', value: ui.email, testid: 'cloud-email', enterkeyhint: 'send' });
+      emailIn.setAttribute('autocomplete', 'email');
+      const send = h('button', { class: 'primary-btn wide', 'data-testid': 'cloud-send' }, 'Email me a sign-in code');
+      send.onclick = run(send, async () => { ui.email = await C.sendCode(emailIn.value); ui.step = 'code'; toast('Code sent to ' + ui.email); });
+      emailIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); send.click(); } });
+      return Card('Account & backup', 'Keep your home safe, even on a new phone',
+        h('div', { class: 'details-card pad', 'data-testid': 'account-card' }, inviteNote, why, emailIn, send));
+    }
+
+    const home = C.home();
+    const signOut = h('button', { class: 'delete-btn', 'data-testid': 'cloud-signout' }, h('span', null, 'Sign out'));
+    signOut.onclick = run(signOut, async () => { await C.signOut(); toast('Signed out. Everything stays on this phone.'); });
+    if (!C.active()) {
+      const retry = h('button', { class: 'primary-btn wide', 'data-testid': 'cloud-retry' }, 'Connect backup');
+      retry.onclick = run(retry, async () => { await C.connect(); toast('Backed up'); });
+      return Card('Account & backup', 'Signed in as ' + C.email(),
+        h('div', { class: 'details-card pad', 'data-testid': 'account-card' }, inviteNote,
+          h('div', { class: 'set-status' }, C.error || 'Not connected yet. Tap below when you’re online.'), retry, signOut));
+    }
+    const now = h('button', { class: 'keep-btn wide', 'data-testid': 'cloud-sync' }, icon('refresh', 16), h('span', null, 'Back up now'));
+    now.onclick = run(now, async () => { await C.syncNow(); toast('Backed up'); });
+    const base = location.origin + location.pathname;
+    const invite = h('button', { class: 'keep-btn wide', 'data-testid': 'cloud-invite' }, icon('send', 16), h('span', null, 'Invite family'));
+    invite.onclick = run(invite, async () => {
+      if (!home.invite) await C.newInvite();
+      await A.shareText('Join our home on HomeKeeper: ' + C.inviteLink(base) + '\nOpen the link, then sign in with your email.');
+    });
+    const reset = h('button', { class: 'link-btn', 'data-testid': 'cloud-new-invite' }, 'Stop old invite links working');
+    reset.onclick = run(reset, async () => { await C.newInvite(); toast('Old invite links no longer work'); });
+    const members = Number(home.members) || 1;
+    return Card('Account & backup', 'Signed in as ' + C.email(),
+      h('div', { class: 'details-card pad', 'data-testid': 'account-card' },
+        h('div', { class: 'info-card ok', 'data-testid': 'cloud-status' }, icon(C.error ? 'alert-circle' : 'shield', 18, C.error ? 'destructive' : 'primary'),
+          h('div', null, C.error ? h('span', null, h('b', null, 'Backup paused. '), C.error) : h('span', null, h('b', null, 'Backed up '), ago(home.lastSync) + (members > 1 ? ' · shared by ' + members + ' people' : '')))),
+        h('div', { class: 'btn-row' }, now, invite),
+        h('div', { class: 'hint left' }, 'Every phone signed in to this home stays in sync. Documents and photos aren’t backed up; they stay on the phone where you added them.'),
+        members > 1 || home.invite ? reset : null,
+        signOut));
+  }
+
   function settings() {
     const s = store.shared, p = store.prefs;
     const cd = s.calDefaults, nd = s.ntfDefaults;
@@ -633,6 +697,7 @@ export function createScreens(A) {
     const file = h('input', { type: 'file', accept: 'application/json,.json', hidden: true, onchange: async () => { try { const txt = await file.files[0].text(); const r = store.mergeRemote(JSON.parse(txt)); toast(r.localChanged ? 'Backup merged' : 'Nothing new in that backup'); } catch (e) { toast('That file is not a HomeKeeper backup'); } A.render(); } });
     return screen(
       hdr({ eyebrow: 'PREFERENCES', title: 'Settings', subtitle: 'Make HomeKeeper yours' }),
+      accountCard(),
       Card('Appearance', 'Light, dark, or match your phone',
         Segmented([{ value: 'auto', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }], p.theme, (v) => { store.setPrefs({ theme: v }); A.applyTheme(); A.render(); A.reloadIfBarStale(); }),
           h('div', { class: 'label inline' }, 'Look'),
@@ -665,7 +730,10 @@ export function createScreens(A) {
           h('div', { class: 'hint left' }, 'ntfy holds each reminder on its server until the right time, so it arrives even when this app is closed. It can only hold reminders about two days ahead, so open HomeKeeper every day or two to keep them topped up.'))),
       Card('Family sync', 'Share everything with your partner',
         h('div', { class: 'details-card pad' },
-          syncOn
+          A.cloud.active()
+            ? [h('div', { class: 'set-sub', 'data-testid': 'family-via-account' }, 'Your account now keeps everyone in sync, so you don’t need the family code. Invite your partner from Account & backup above.'),
+              syncOn ? h('div', { class: 'hint left' }, 'Your family code is kept only for phone reminders (ntfy), so your topic doesn’t change.') : null]
+            : syncOn
             ? [h('div', { class: 'label inline' }, 'Your family code'), h('div', { class: 'mono', 'data-testid': 'family-code' }, p.familyCode),
               h('div', { class: 'btn-row' }, h('button', { class: 'keep-btn wide', onclick: () => A.shareText('Join my HomeKeeper family: ' + p.familyCode) }, icon('send', 16), h('span', null, 'Share code')), syncBtn),
               status,
@@ -676,12 +744,12 @@ export function createScreens(A) {
           h('details', { class: 'adv' }, h('summary', null, 'Advanced'),
             h('div', { class: 'set-sub' }, 'Use your own sync endpoint (any URL that accepts GET and PUT of JSON). Leave empty for the default.'),
             TextInput({ label: 'Sync endpoint', value: p.syncEndpoint, placeholder: 'https://…', type: 'url', autocapitalize: 'none', onInput: (v) => store.setPrefs({ syncEndpoint: v.trim() }) })))),
-      Card('Your data', 'Stored on this phone' + (syncOn ? ' and synced to your family' : ''),
+      Card('Your data', 'Stored on this phone' + (A.cloud.active() ? ' and backed up to your account' : syncOn ? ' and synced to your family' : ''),
         h('div', { class: 'details-card pad' },
           h('div', { class: 'btn-row' }, h('button', { class: 'keep-btn wide', onclick: () => A.exportBackup(), 'data-testid': 'export-backup' }, icon('download', 16), h('span', null, 'Export backup')), h('button', { class: 'keep-btn wide', onclick: () => file.click() }, icon('upload', 16), h('span', null, 'Import backup')), file),
           h('button', { class: 'keep-btn wide mt', disabled: !store.canUndo(), onclick: () => { toast(store.undo() ? 'Undone' : 'Nothing to undo'); }, 'data-testid': 'undo-last' }, icon('rotate-ccw', 16), h('span', null, 'Undo last change'))),
-        h('div', { class: 'info-card warn', 'data-testid': 'files-local-note' }, icon('paperclip', 18, 'primary'), h('div', null, h('b', null, 'Your files stay on this phone. '), 'They are not sent through Family sync and are not in Export backup, so nobody else sees them and they cannot be restored on a new phone. If you delete the app or clear Safari’s website data, they are gone. Use “Share or save” on a file to keep a copy elsewhere.'))),
-      h('div', { class: 'footer-note' }, 'HomeKeeper · all data lives on your phone unless you turn on family sync.'));
+        h('div', { class: 'info-card warn', 'data-testid': 'files-local-note' }, icon('paperclip', 18, 'primary'), h('div', null, h('b', null, 'Your files stay on this phone. '), 'They are not sent through Family sync or your account backup, and are not in Export backup, so nobody else sees them and they cannot be restored on a new phone. If you delete the app or clear Safari’s website data, they are gone. Use “Share or save” on a file to keep a copy elsewhere.'))),
+      h('div', { class: 'footer-note' }, A.cloud.active() ? 'HomeKeeper · saved on this phone and backed up to ' + A.cloud.email() + '.' : 'HomeKeeper · all data lives on your phone unless you sign in or turn on family sync.'));
   }
 
   const kit = { ItemForm, forms, openForm, closeForm, hdr, screen, money, today, withToast, cheer, ui, calTri, ntfTri };

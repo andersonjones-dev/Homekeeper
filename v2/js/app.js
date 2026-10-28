@@ -2,6 +2,7 @@
 import { h, todayStr } from './util.js';
 import { Store, allWhen } from './store.js';
 import { Sync } from './sync.js';
+import { Cloud } from './cloud.js';
 import { buildICS } from './calendar.js';
 import { topicFromCode, reconcile, sendNow, WINDOW_HOURS } from './notify.js';
 import { icon, setUndoHandler, toast } from './ui.js';
@@ -17,6 +18,7 @@ let storage;
 try { storage = window.localStorage; storage.getItem('x'); } catch (e) { const m = {}; storage = { getItem: (k) => m[k] ?? null, setItem: (k, v) => { m[k] = v; } }; }
 const store = new Store(storage);
 const sync = new Sync(store);
+const cloud = new Cloud(store);
 const root = document.getElementById('app');
 
 const TABS = [
@@ -38,7 +40,7 @@ const MENU = [
 ];
 
 const A = {
-  store, sync, topicCache: '', ntfyStatus: '',
+  store, sync, cloud, cloudUI: { step: 'email', email: '' }, topicCache: '', ntfyStatus: '',
   today: todayStr,
   nav(path, replace) { const h2 = '#' + path; if (replace) location.replace(h2); else location.hash = h2; },
   back() { if (history.length > 1) history.back(); else A.nav('/'); },
@@ -190,10 +192,28 @@ function openMenu() {
 
 // ---------- sync ----------
 let syncTimer = null;
-function queueSync() { if (!sync.enabled()) return; clearTimeout(syncTimer); syncTimer = setTimeout(doSync, 2500); }
+function queueSync() { if (!sync.enabled() && !cloud.active()) return; clearTimeout(syncTimer); syncTimer = setTimeout(doSync, 2500); }
 async function doSync() {
-  if (!sync.enabled() || !navigator.onLine) return;
+  if (!navigator.onLine) return;
+  // Signed in: the account keeps everyone in sync, so the old family-code sync rests.
+  if (cloud.active()) {
+    try { await cloud.syncNow(); } catch (e) { console.warn('cloud', e); }
+    if (route().path === '/settings' && !(document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName))) render();
+    return;
+  }
+  if (!sync.enabled()) return;
   try { await sync.syncNow(); } catch (e) { console.warn('sync', e); A.syncError = String(e.message || e); }
+}
+// Opened an invite link (…/v2/?join=<home>.<secret>): remember it and join once signed in.
+function handleInvite() {
+  let code = '';
+  try { code = new URLSearchParams(location.search).get('join') || ''; } catch (e) { code = ''; }
+  if (!code) return;
+  try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ignore */ }
+  A.nav('/settings', true);
+  cloud.acceptInvite(code)
+    .then(() => { toast(cloud.signedIn() ? 'Joined the home. Everything is now shared.' : 'Sign in under Account & backup to join this home.'); render(); })
+    .catch((e) => { toast(String(e.message || e)); render(); });
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { doSync(); scheduleNtfy(); } });
 setInterval(() => { if (document.visibilityState === 'visible') doSync(); }, 60000);
@@ -232,6 +252,7 @@ async function scheduleNtfy() {
 
 // ---------- boot ----------
 applyTheme();
+handleInvite();
 render();
 topic();
 doSync().then(() => scheduleNtfy());

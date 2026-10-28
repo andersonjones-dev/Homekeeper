@@ -8,7 +8,7 @@
  *
  * The app always opens from the saved copy, so it works with no internet.
  */
-const VERSION = 'hk2-v3';
+const VERSION = 'hk2-v4';
 const PREFIX = 'hk2-';   // only caches starting with this are ever deleted: other apps share this storage
 const LIB = 'hk2-lib';         // fonts and libraries from other sites, kept between versions
 const KEEP = ["hk2-cal"];
@@ -16,6 +16,7 @@ const CORE = [
   './',
   'index.html',
   'update.js',
+  'config.js',
   'manifest.webmanifest',
   'css/app.css',
   'js/app.js',
@@ -36,6 +37,7 @@ const CORE = [
   'js/ui.js',
   'js/util.js',
   'js/voice.js',
+  'js/cloud.js',
   '../icon-192.png',
   '../icon-512.png',
   '../apple-touch-icon.png'

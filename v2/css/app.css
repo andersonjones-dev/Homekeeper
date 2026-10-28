@@ -393,3 +393,8 @@ button.budget-watch { width: 100%; text-align: left; font: inherit; cursor: poin
 .look-opt.on { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 .look-dot { width: 18px; height: 18px; border-radius: 50%; display: inline-block; border: 1px solid rgba(128,128,128,.4); }
 :root[data-look="onyx"] .summary::before { opacity: .75; }
+/* Account & backup */
+.info-card.ok { margin-bottom: 0; }
+.btn-row.mt { margin-top: 10px; }
+.link-btn { display: block; width: 100%; min-height: 44px; margin-top: 6px; color: var(--muted-fg); font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; background: none; border: 0; }
+[data-testid="account-card"] .input { margin-bottom: 10px; }
