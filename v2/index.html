@@ -64,5 +64,6 @@ async function takeOver(){
 }
 takeOver().then(function(){return import('./js/app.js');}).catch(function(e){window.__bootCheck(String(e&&e.message||e));});
 </script>
+<script src="update.js" data-app="HomeKeeper" data-sw="./sw.js"></script>
 </body>
 </html>
