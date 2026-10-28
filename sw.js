@@ -1,5 +1,5 @@
 /* HomeKeeper service worker: caches the app so it opens offline. Bump VERSION when you upload a new index.html. */
-const VERSION = 'homekeeper-v1';
+const VERSION = 'homekeeper-v2';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
@@ -9,7 +9,8 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== 'homekeeper-fonts').map((k) => caches.delete(k))))
+      // Only remove HomeKeeper's own old caches. Other apps on this site share the same storage.
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('homekeeper-') && k !== VERSION && k !== 'homekeeper-fonts').map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -35,7 +36,8 @@ self.addEventListener('fetch', (e) => {
 
   if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(req)
+      // Try the network for up to 3 seconds, then use the saved copy.
+      Promise.race([fetch(req), new Promise((_, no) => setTimeout(no, 3000))])
         .then((res) => { const copy = res.clone(); caches.open(VERSION).then((c) => c.put('index.html', copy)); return res; })
         .catch(() => caches.match('index.html').then((r) => r || caches.match('./')))
     );
