@@ -8,7 +8,7 @@
  *
  * The app always opens from the saved copy, so it works with no internet.
  */
-const VERSION = 'homekeeper-v3';
+const VERSION = 'homekeeper-v4';
 const PREFIX = 'homekeeper-';   // only caches starting with this are ever deleted: other apps share this storage
 const LIB = 'homekeeper-fonts';         // fonts and libraries from other sites, kept between versions
 const KEEP = [];

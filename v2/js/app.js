@@ -109,8 +109,11 @@ function applyTheme() {
   loadLookFonts(look);
   // Tell the phone about the new colour: swap in a fresh theme-color tag (iOS notices a new tag, not just a changed value).
   const colour = barColour(look, dark, style);
-  document.querySelectorAll('meta[name=theme-color]').forEach((m) => m.remove());
-  const meta = document.createElement('meta'); meta.name = 'theme-color'; meta.content = colour; document.head.appendChild(meta);
+  const cur = document.querySelector('meta[name=theme-color]');
+  if (!cur || cur.content !== colour) {   // only touch it when the colour really changes
+    document.querySelectorAll('meta[name=theme-color]').forEach((m) => m.remove());
+    const meta = document.createElement('meta'); meta.name = 'theme-color'; meta.content = colour; document.head.appendChild(meta);
+  }
   root.style.backgroundColor = colour;
   if (shownKey === null) shownKey = key;
 }

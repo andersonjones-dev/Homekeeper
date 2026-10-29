@@ -1,3 +1,11 @@
+/* Bottom spacing (same in all of Anderson's apps; ClockIt 2.4.1, checked on an iPhone 12).
+   --safe-b is the home-bar space, reduced by however much iOS has made a Home Screen
+   app's window short (it then already ends above the home bar). CSS only: no height
+   measuring code, which made iOS shrink the window and the layout jump. */
+:root{--safe-b:env(safe-area-inset-bottom,0px)}
+@supports (height:100lvh){:root{--safe-b:max(0px,calc(env(safe-area-inset-bottom,0px) - clamp(0px,100lvh - 100dvh,60px)))}}
+/* Double tap never zooms (pinch zoom still works, so text can be enlarged). */
+:where(html,body,*){touch-action:manipulation}
 /* HomeKeeper (v2): styles ported from HomeKeeper2's React Native styles. Tokens from constants/colors.ts. */
 :root, :root[data-theme="light"] {
   --fg: #24312C; --primary: #607C69; --bg: #F7F6F0; --card: #FFFFFF; --primary-fg: #FFFFFF;
@@ -27,10 +35,10 @@ h1 { margin: 0; }
 .screen { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-top: env(safe-area-inset-top); }
 .content { padding: 20px 21px 124px; }
 .content.detail { padding: 8px 22px 32px calc(22px); }
-.screen.full .content { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+.screen.full .content { padding-bottom: calc(32px + var(--safe-b)); }
 
 /* tab bar (web classic layout: height 84, 1px top border, background = colors.background) */
-.tabbar { position: absolute; left: 0; right: 0; bottom: 0; height: max(84px, calc(62px + env(safe-area-inset-bottom))); background: var(--bg); border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 5; }
+.tabbar { position: absolute; left: 0; right: 0; bottom: 0; height: max(84px, calc(62px + var(--safe-b))); background: var(--bg); border-top: 1px solid var(--border); display: flex; padding-bottom: var(--safe-b); z-index: 5; }
 .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px; padding-top: 11px; color: var(--muted-fg); font-size: 10px; font-weight: 500; text-align: center; }
 .tab.on { color: var(--primary); }
 
@@ -207,7 +215,7 @@ textarea.input { min-height: 108px; padding: 14px 15px; resize: vertical; line-h
 
 /* sidebar */
 .sidebar-back, .sheet-back { position: fixed; inset: 0; background: var(--shadow); z-index: 20; animation: fade .18s ease; }
-.sidebar { position: fixed; top: 0; bottom: 0; left: 0; width: min(310px, 82%); background: var(--bg); z-index: 21; padding: calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 16px); display: flex; flex-direction: column; border-right: 1px solid var(--border); animation: slide .2s ease; overflow-y: auto; }
+.sidebar { position: fixed; top: 0; bottom: 0; left: 0; width: min(310px, 82%); background: var(--bg); z-index: 21; padding: calc(env(safe-area-inset-top) + 18px) 16px calc(var(--safe-b) + 16px); display: flex; flex-direction: column; border-right: 1px solid var(--border); animation: slide .2s ease; overflow-y: auto; }
 .sidebar-top { display: flex; justify-content: space-between; align-items: center; } .sidebar-top .brand { margin: 0; }
 .sidebar-title { font-size: 22px; font-weight: 700; letter-spacing: -.5px; margin: 14px 0 20px; }
 .sidebar-list { display: flex; flex-direction: column; gap: 6px; flex: 1; }
@@ -218,11 +226,11 @@ textarea.input { min-height: 108px; padding: 14px 15px; resize: vertical; line-h
 @keyframes slide { from { transform: translateX(-30px); opacity: 0; } to { transform: none; opacity: 1; } } @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
 /* toast (bottom 96, card bg, r18, Undo in primary) */
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom) * 0); width: min(calc(100% - 42px), 520px); background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; z-index: 40; box-shadow: 0 6px 24px rgba(0,0,0,.14); animation: fade .15s ease; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + var(--safe-b) * 0); width: min(calc(100% - 42px), 520px); background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; z-index: 40; box-shadow: 0 6px 24px rgba(0,0,0,.14); animation: fade .15s ease; }
 .toast-msg { font-size: 13px; font-weight: 500; } .toast-undo { font-size: 13px; font-weight: 700; color: var(--primary); padding: 6px 4px 6px 12px; }
 
 /* sheet (voice) */
-.sheet { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: 100%; max-width: 600px; max-height: 88vh; overflow-y: auto; background: var(--bg); border-radius: 26px 26px 0 0; padding: 18px 21px calc(24px + env(safe-area-inset-bottom)); z-index: 30; border: 1px solid var(--border); animation: up .2s ease; }
+.sheet { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: 100%; max-width: 600px; max-height: 88vh; overflow-y: auto; background: var(--bg); border-radius: 26px 26px 0 0; padding: 18px 21px calc(24px + var(--safe-b)); z-index: 30; border: 1px solid var(--border); animation: up .2s ease; }
 @keyframes up { from { transform: translate(-50%, 30px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; } .sheet-title { font-size: 19px; font-weight: 700; letter-spacing: -.35px; }
 .voice { display: flex; flex-direction: column; align-items: stretch; gap: 14px; }
@@ -445,7 +453,7 @@ button.budget-watch { width: 100%; text-align: left; font: inherit; cursor: poin
 :root[data-look="neu"] .switch.on { background: var(--bg); }
 :root[data-look="neu"] .knob { background: var(--raised); box-shadow: var(--nsh1); }
 :root[data-look="neu"] .switch.on .knob { background: var(--primary); box-shadow: var(--glow); }
-:root[data-look="neu"] .tabbar { left: 14px; right: 14px; bottom: max(14px, env(safe-area-inset-bottom)); height: auto; min-height: 66px; padding: 8px; gap: 4px; border: 0; border-radius: 26px; background: var(--raised); box-shadow: var(--nsh1); }
+:root[data-look="neu"] .tabbar { left: 14px; right: 14px; bottom: max(14px, var(--safe-b)); height: auto; min-height: 66px; padding: 8px; gap: 4px; border: 0; border-radius: 26px; background: var(--raised); box-shadow: var(--nsh1); }
 :root[data-look="neu"] .tab { flex: 1; min-width: 0; justify-content: center; padding: 6px 0; border-radius: 18px; }
 :root[data-look="neu"] .tab.on { box-shadow: var(--nsh2); color: var(--primary); }
 :root[data-look="neu"] .tab.on .ic { filter: drop-shadow(var(--glow)); }
@@ -511,7 +519,7 @@ button.budget-watch { width: 100%; text-align: left; font: inherit; cursor: poin
 :root[data-look="bento"] .summary-metric:nth-child(1) .summary-number { font-size: 56px; }
 :root[data-look="bento"] .summary-metric:nth-child(3) .summary-number, :root[data-look="bento"] .summary-metric:nth-child(5) .summary-number { font-size: 40px; }
 :root[data-look="bento"] .summary-metric:is(:nth-child(1), :nth-child(3), :nth-child(5)) .metric-label { color: inherit; opacity: .85; }
-:root[data-look="bento"] .tabbar { left: 16px; right: 16px; bottom: max(14px, env(safe-area-inset-bottom)); height: auto; padding: 7px; gap: 4px; border: 0; border-radius: 999px; background: var(--nav-bg); align-items: center; justify-content: space-between; }
+:root[data-look="bento"] .tabbar { left: 16px; right: 16px; bottom: max(14px, var(--safe-b)); height: auto; padding: 7px; gap: 4px; border: 0; border-radius: 999px; background: var(--nav-bg); align-items: center; justify-content: space-between; }
 :root[data-look="bento"] .tab { flex: 0 0 auto; flex-direction: row; justify-content: center; align-items: center; gap: 8px; min-width: 48px; height: 48px; padding: 0 14px; border-radius: 999px; color: var(--nav-ico); }
 :root[data-look="bento"] .tab > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 :root[data-look="bento"] .tab.on { flex: 1; background: #FFFFFF; color: #111214; }
