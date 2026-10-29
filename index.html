@@ -1160,7 +1160,7 @@ function openAbout(){
   +'<p class="footnote" style="margin-top:14px">The app can’t send alerts by itself. Add due dates to your Calendar to get phone alerts the day before and on the morning.</p>'
   +'<div class="stack" style="margin-top:14px"><button class="btn btn-primary" data-act="cal-all">'+I('cal')+'Add '+plural(n,'due date')+' to Calendar</button>'
   +'<button class="btn btn-ghost" data-act="backup">'+I('download')+'Back up data</button><button class="btn btn-ghost" data-act="restore">'+I('upload')+'Restore from backup</button></div>'
-  +'<div class="stack" style="margin-top:10px"><button class="btn btn-ghost" data-act="remove-sample">Remove sample items</button><button class="btn btn-ghost" data-act="reset-sample">Reset to sample data</button><button class="btn btn-danger" data-act="erase-all">Erase all my data</button><button class="btn btn-primary" data-act="close-sheet">Close</button></div>');
+  +'<div class="stack" style="margin-top:10px"><button class="btn btn-ghost" data-act="remove-sample">Remove sample items</button><button class="btn btn-ghost" data-act="reset-sample">Reset to sample data</button><button class="btn btn-danger" data-act="erase-all">Erase all my data</button><button class="btn btn-primary" data-act="close-sheet">Close</button></div>'+(window.AppAbout?AppAbout.linkHTML():''));
 }
 
 /* ---------- actions ---------- */
@@ -1328,6 +1328,7 @@ try{if(!inClaude()&&'serviceWorker' in navigator&&/^https?:$/.test(location.prot
 if(window.__HK_TEST){window.__hk={go:go,A:A,UI:UI,st:function(){return state;},submitForm:submitForm,openForm:openForm,complete:complete,feed:feed,addShopItem:addShopItem,migrate:migrate,normalize:normalize,seed:seed,render:render,nextDate:nextDate,buildIcs:buildIcs,allCalEntries:allCalEntries,restoreFromText:restoreFromText,pack:pack};}
 })();
 </script>
+<script src="about.js" data-app="HomeKeeper" data-desc="Keep track of everything in your home: assets, warranties, maintenance, bills and chores, with reminders before things are due."></script>
 <script src="update.js" data-app="HomeKeeper"></script>
 </body>
 </html>

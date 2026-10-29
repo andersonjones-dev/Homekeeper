@@ -755,7 +755,8 @@ export function createScreens(A) {
           h('div', { class: 'btn-row' }, h('button', { class: 'keep-btn wide', onclick: () => A.exportBackup(), 'data-testid': 'export-backup' }, icon('download', 16), h('span', null, 'Export backup')), h('button', { class: 'keep-btn wide', onclick: () => file.click() }, icon('upload', 16), h('span', null, 'Import backup')), file),
           h('button', { class: 'keep-btn wide mt', disabled: !store.canUndo(), onclick: () => { toast(store.undo() ? 'Undone' : 'Nothing to undo'); }, 'data-testid': 'undo-last' }, icon('rotate-ccw', 16), h('span', null, 'Undo last change'))),
         h('div', { class: 'info-card warn', 'data-testid': 'files-local-note' }, icon('paperclip', 18, 'primary'), h('div', null, h('b', null, 'Your files stay on this phone. '), 'They are not sent through Family sync or your account backup, and are not in Export backup, so nobody else sees them and they cannot be restored on a new phone. If you delete the app or clear Safari’s website data, they are gone. Use “Share or save” on a file to keep a copy elsewhere.'))),
-      h('div', { class: 'footer-note' }, A.cloud.active() ? 'HomeKeeper · saved on this phone and backed up to ' + A.cloud.email() + '.' : 'HomeKeeper · all data lives on your phone unless you sign in or turn on family sync.'));
+      h('div', { class: 'footer-note' }, A.cloud.active() ? 'HomeKeeper · saved on this phone and backed up to ' + A.cloud.email() + '.' : 'HomeKeeper · all data lives on your phone unless you sign in or turn on family sync.'),
+      window.AppAbout ? AppAbout.link() : null);
   }
 
   const kit = { ItemForm, forms, openForm, closeForm, hdr, screen, money, today, withToast, cheer, ui, calTri, ntfTri };
