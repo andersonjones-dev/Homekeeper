@@ -11,7 +11,7 @@ import {
 import { buildICS } from './calendar.js';
 import { celebration, ownership } from './delight.js';
 import { extraAttention } from './extras.js';
-import { DARK_STYLES, LOOKS } from './themes.js';
+import { LOOKS, lookKey } from './themes.js';
 import { topicFromCode } from './notify.js';
 
 export function createScreens(A) {
@@ -707,10 +707,8 @@ export function createScreens(A) {
       Card('Appearance', 'Light, dark, or match your phone',
         Segmented([{ value: 'auto', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }], p.theme, (v) => { store.setPrefs({ theme: v }); A.applyTheme(); A.render(); A.reloadIfBarStale(); }),
           h('div', { class: 'label inline' }, 'Look'),
-          h('div', { class: 'look-opts', 'data-testid': 'look-opts' }, Object.entries(LOOKS).map(([k, l]) => h('button', { class: 'look-opt' + ((p.look || 'classic') === k ? ' on' : ''), 'aria-pressed': (p.look || 'classic') === k, 'data-testid': 'look-' + k, onclick: () => { store.setPrefs({ look: k }); A.applyTheme(); A.render(); A.reloadIfBarStale(); } }, h('span', { class: 'look-dot', style: 'background:' + l.dot + ';box-shadow:inset 0 0 0 6px ' + l.dotBg }), h('span', null, l.label)))),
-          (p.look || 'classic') === 'onyx' ? h('div', { class: 'hint left', 'data-testid': 'onyx-note' }, 'Onyx is always dark, so Light and the dark styles are paused while it is on.') : null,
-          (p.look || 'classic') === 'classic' ? h('div', { class: 'label inline' }, 'Dark style') : null,
-          (p.look || 'classic') !== 'classic' ? null : h('div', { class: 'dark-styles', 'data-testid': 'dark-styles' }, Object.entries(DARK_STYLES).map(([k, d]) => h('button', { class: 'dark-style' + ((p.darkStyle || 'midnight') === k ? ' on' : ''), 'aria-pressed': (p.darkStyle || 'midnight') === k, 'data-testid': 'dark-' + k, onclick: () => { store.setPrefs({ darkStyle: k }); A.applyTheme(); A.render(); A.reloadIfBarStale(true); } }, h('span', { class: 'dark-dot', style: 'background:' + d.dot + ';box-shadow:inset 0 0 0 6px ' + d.bg }), h('span', null, d.label)))),
+          h('div', { class: 'look-opts', 'data-testid': 'look-opts' }, Object.entries(LOOKS).map(([k, l]) => h('button', { class: 'look-opt' + (lookKey(p.look) === k ? ' on' : ''), 'aria-pressed': lookKey(p.look) === k, 'data-testid': 'look-' + k, onclick: () => { store.setPrefs({ look: k }); A.applyTheme(); A.render(); A.reloadIfBarStale(); } }, h('span', { class: 'look-dot', style: 'background:' + l.dot + ';box-shadow:inset 0 0 0 6px ' + l.dotBg }), h('span', null, l.label)))),
+          lookKey(p.look) === 'onyx' ? h('div', { class: 'hint left', 'data-testid': 'onyx-note' }, 'Onyx is always dark, so Light is paused while it is on.') : null,
           h('div', { class: 'hint left' }, 'The app reloads once when the theme changes, so the phone’s status bar colour can follow it.')),
       Card('Fun messages', 'A little cheer when you finish something',
         h('div', { class: 'details-card' }, SetRow('Show pop-up cheers and the odd joke', null, Switch(p.fun !== false, (v) => store.setPrefs({ fun: v }), 'Fun messages'), true))),

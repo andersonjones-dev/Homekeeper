@@ -18,7 +18,7 @@ export const DEFAULT_SHARED = () => ({
 });
 export const DEFAULT_PREFS = () => ({
   theme: 'auto',
-  look: 'classic',
+  look: 'linen',
   fun: true,
   darkStyle: 'midnight',
   name: '',
