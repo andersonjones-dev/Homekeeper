@@ -3,20 +3,19 @@
  * ---------------------------------------------------------------
  * IMPORTANT: change VERSION every time you publish a change on GitHub.
  * Phones then download the new version in the background and show
- * "A new version of HomeKeeper is ready" with an Update button (update.js).
+ * "A new version of HomeKeeper is ready" with an Update button (the App-Kit update bar).
  * Nothing changes until Update is tapped, so it never interrupts anyone.
  *
  * The app always opens from the saved copy, so it works with no internet.
  */
-const VERSION = 'hk2-v8';
+const VERSION = 'hk2-v9';
 const PREFIX = 'hk2-';   // only caches starting with this are ever deleted: other apps share this storage
 const LIB = 'hk2-lib';         // fonts and libraries from other sites, kept between versions
 const KEEP = ["hk2-cal"];
 const CORE = [
   './',
   'index.html',
-  'update.js',
-  'about.js',
+  '/App-Kit/v1/kit.js',
   'config.js',
   'manifest.webmanifest',
   'css/app.css',
@@ -90,6 +89,22 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+
+  // Shared App-Kit (install strip, About, update bar) from andersonjones-dev.github.io/App-Kit:
+  // open the saved copy straight away and save the newest copy in the background for next time.
+  if (url.pathname.indexOf('/App-Kit/') === 0 && (url.origin === self.location.origin || url.hostname === 'andersonjones-dev.github.io')) {
+    e.respondWith(caches.open(VERSION).then(function (c) {
+      return c.match(req, { ignoreSearch: true }).then(function (hit) {
+        var net = fetch(req, { cache: 'no-cache' }).then(function (r) {
+          if (r && (r.ok || r.type === 'opaque')) c.put(req, r.clone());
+          return r;
+        });
+        if (hit) { e.waitUntil(net.catch(function () {})); return hit; }
+        return net;
+      });
+    }));
+    return;
+  }
   // The calendar file the page just built, served at a real web address so iPhone offers "Add All".
   if (url.origin === location.origin && url.pathname.endsWith('/cal/homekeeper.ics')) {
     e.respondWith(caches.open('hk2-cal').then((c) => c.match('cal/homekeeper.ics')).then((r) => r ||
