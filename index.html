@@ -187,11 +187,6 @@ button.ring:active i{background:var(--sage-soft);border-color:var(--sage)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:26px;padding:4px 16px 2px;box-shadow:var(--shadow);margin-bottom:24px}
 .card .group{margin-bottom:6px}
 .card .empty{padding-bottom:18px}
-.install{display:flex;gap:12px;align-items:center;background:var(--sage-soft);color:var(--sage-text);border-radius:20px;padding:12px 8px 12px 14px;margin:6px 0 12px;font-size:14.5px;line-height:1.35}
-.install p{flex:1;min-width:0}
-.install .btn{width:auto;min-height:40px;padding:0 14px;font-size:14.5px;border-radius:14px;flex:none}
-.install .x{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex:none}
-.install .x .ic{width:18px;height:18px}
 
 /* stats row (assets tab) */
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
@@ -621,7 +616,7 @@ function overdueCount(kind){
 /* ---------- ui state ---------- */
 var view='today',params={};
 var UI={todaySeg:'today',todayKind:'all',homeSeg:'assets',taskFilter:'all',choreSeg:'todo',choreWho:'all',billSeg:'unpaid',catFilter:'All',warrFilter:'all',searchQ:''};
-var confirmFn=null,toastTimer=null,toastAction=null,installEvt=null;
+var confirmFn=null,toastTimer=null,toastAction=null;
 
 function go(v,p){view=v;params=p||{};closeSheet();render();window.scrollTo(0,0);}
 function render(){
@@ -779,13 +774,6 @@ function empty(tile,icon,title,text,btn){
    Anderson's apps (it was linked to the screen-height jumping in ClockIt). */
 var STANDALONE=(function(){try{return window.navigator.standalone===true||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);}catch(e){return false;}})();
 function isStandalone(){return STANDALONE;}
-function installBanner(){
-  if(inClaude()||isStandalone())return '';
-  try{if(localStorage.getItem('hk.hint')==='1')return '';}catch(e){}
-  var ios=/iphone|ipad|ipod/i.test(navigator.userAgent||'');
-  var text=ios?'<b>Install on your iPhone.</b> Tap the Share button, then “Add to Home Screen”.':installEvt?'<b>Install HomeKeeper</b> for quick access and offline use.':'<b>Install this app.</b> Open your browser menu and choose “Install app”.';
-  return '<div class="install" role="note"><span class="tile sm t-sage">'+I('home')+'</span><p>'+text+'</p>'+(installEvt&&!ios?'<button class="btn btn-primary" data-act="install-app">Install</button>':'')+'<button class="x" data-act="hide-hint" aria-label="Dismiss">'+I('close')+'</button></div>';
-}
 function renderToday(m){
   var t=todayStr(),all=feed();
   var h=new Date().getHours(),greet=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
@@ -818,7 +806,7 @@ function renderToday(m){
     if(!body)body=empty('lav','bell','Nothing coming up','Add a reminder, bill or chore to plan ahead.',['Add something','fab']);
   }
   var watch=state.assets.filter(function(a){var k=warranty(a).k;return k==='expired'||k==='soon';}).slice(0,3);
-  m.innerHTML='<div class="view">'+appbar('',true)+installBanner()
+  m.innerHTML='<div class="view">'+appbar('',true)
   +'<section class="hero2" aria-label="Today"><p class="hero2-date">'+esc(new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'}))+'</p><p class="hero2-greet">'+greet+'</p>'
   +'<div class="hero2-row"><span class="hero2-num">'+dueNow.length+'</span><span class="hero2-lbl">'+(dueNow.length===1?'thing':'things')+'<br>due today</span></div>'
   +'<p class="hero2-sub">'+esc(sub)+'</p><button class="btn" data-act="fab">'+I('plus')+'Add something</button></section>'
@@ -1179,12 +1167,6 @@ var A={
     else if(v==='tasks'){UI.homeSeg='tasks';UI.taskFilter='all';go('home');}
     else{UI.homeSeg='assets';UI.catFilter='All';UI.searchQ='';UI.warrFilter=v==='expired'?'expired':'all';go('home');}
   },
-  'hide-hint':function(){try{localStorage.setItem('hk.hint','1');}catch(e){}render();},
-  'install-app':function(){
-    var e=installEvt;if(!e)return;installEvt=null;
-    try{e.prompt();}catch(x){}
-    render();
-  },
   'fab':function(){
     if(view==='today')openAddMenu();
     else if(view==='home'){if(UI.homeSeg==='assets')go('form',{from:'home'});else openForm('task');}
@@ -1318,7 +1300,6 @@ document.addEventListener('change',function(e){
   if(t.classList&&t.classList.contains('invalid')){t.classList.remove('invalid');var er=$('#'+t.id+'Err');if(er)er.textContent='';}
 });
 document.addEventListener('visibilitychange',function(){if(!document.hidden&&view!=='form'&&$('#sheet').hidden)render();});
-try{window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();installEvt=e;if(view==='today'&&$('#sheet').hidden)render();});}catch(e){}
 
 /* ---------- boot ---------- */
 initStorage();
@@ -1329,6 +1310,7 @@ if(window.__HK_TEST){window.__hk={go:go,A:A,UI:UI,st:function(){return state;},s
 })();
 </script>
 <script src="about.js" data-app="HomeKeeper" data-desc="Keep track of everything in your home: assets, warranties, maintenance, bills and chores, with reminders before things are due."></script>
+<script src="install.js" data-app="HomeKeeper"></script>
 <script src="update.js" data-app="HomeKeeper"></script>
 </body>
 </html>
