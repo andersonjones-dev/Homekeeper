@@ -8,7 +8,7 @@
  *
  * The app always opens from the saved copy, so it works with no internet.
  */
-const VERSION = 'hk2-v9';
+const VERSION = 'hk2-v10';
 const PREFIX = 'hk2-';   // only caches starting with this are ever deleted: other apps share this storage
 const LIB = 'hk2-lib';         // fonts and libraries from other sites, kept between versions
 const KEEP = ["hk2-cal"];
